@@ -434,6 +434,16 @@ const cmsAssetUrl = (value = '') => {
     return value;
   }
 };
+const cmsSetImage = (image, value) => {
+  if (!image || !value) return;
+  if (!image.dataset.cmsImageStateBound) {
+    image.dataset.cmsImageStateBound = 'true';
+    image.addEventListener('load', () => image.classList.remove('cms-image-unavailable'));
+    image.addEventListener('error', () => image.classList.add('cms-image-unavailable'));
+  }
+  image.classList.remove('cms-image-unavailable');
+  image.src = cmsAssetUrl(value);
+};
 const cmsText = (selector, value, html = false, scope = document) => {
   const element = scope.querySelector(selector);
   if (!element || value === undefined || value === null) return;
@@ -448,14 +458,14 @@ const cmsHeadlineWithEmphasis = (value = '', language = 'en') => {
 const cmsImage = (selector, value, alt, position, scope = document) => {
   const image = scope.querySelector(selector);
   if (!image || !value) return;
-  image.src = cmsAssetUrl(value);
+  cmsSetImage(image, value);
   if (alt !== undefined) image.alt = alt;
   if (position) image.style.objectPosition = position;
 };
 const cmsImageList = (selector, records = []) => records.forEach((record, index) => {
   const image = document.querySelectorAll(selector)[index];
   if (!image || !record?.image) return;
-  image.src = cmsAssetUrl(record.image);
+  cmsSetImage(image, record.image);
   const copy = record[document.documentElement.lang === 'sw' ? 'sw' : 'en'] || record.en || {};
   if (copy.alt !== undefined) image.alt = copy.alt;
   if (record.position) image.style.objectPosition = record.position;
@@ -639,7 +649,7 @@ const applyCmsPageContent = (content) => {
     const target = (escaped && document.querySelector(`[data-cms-id="${escaped}"]`)) || document.querySelectorAll(element.selector)[element.index];
     if (!target) return;
     if (element.kind === 'image') {
-      if (element.value) target.src = cmsAssetUrl(element.value);
+      if (element.value) cmsSetImage(target, element.value);
       if (element.alt !== undefined) target.alt = element.alt;
       if (element.position) target.style.objectPosition = element.position;
     } else {

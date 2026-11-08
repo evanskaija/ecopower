@@ -12,14 +12,12 @@ const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
-const { imageSize } = require('image-size');
 const cmsFields = require('./cms-fields.js');
+const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, validateImageReference } = require('./media-security.js');
 
 const ROOT = __dirname;
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
 const DATABASE_URL = process.env.DATABASE_URL || '';
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
 const VERCEL_ENV = process.env.VERCEL_ENV || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
 const BLOB_ENV_PREFIX = VERCEL_ENV === 'preview' ? 'ECOPOWER_PREVIEW' : VERCEL_ENV === 'production' ? 'ECOPOWER_PRODUCTION' : '';
 const privateTokenName = BLOB_ENV_PREFIX ? `${BLOB_ENV_PREFIX}_PRIVATE_READ_WRITE_TOKEN` : 'BLOB_PRIVATE_READ_WRITE_TOKEN';
@@ -194,10 +192,39 @@ function sameOrigin(req, res, next) {
 function audit(req, action, target, metadata = {}) { console.log(JSON.stringify({ at: nowIso(), actor: req.user?.email || 'public', action, target, metadata })); }
 const EDITABLE_SELECTORS = new Set(['main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', 'main img, footer img']);
 const SAFE_HREF = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i;
-const SAFE_IMAGE = /^(?:media:[a-f0-9-]+|https?:\/\/[^\s]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
-function validateContent(slug, content) {
+const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/(?:jpeg|png|webp|avif);base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
+function validateStructuredImages(value, pathName = 'content') {
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const error = validateStructuredImages(item, `${pathName}.${index}`);
+      if (error) return error;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  for (const [key, item] of Object.entries(value)) {
+    if (key === 'image' && typeof item === 'string' && item && (!SAFE_IMAGE.test(item) || validateImageReference(item))) return `Invalid image reference at ${pathName}.${key}.`;
+    const error = validateStructuredImages(item, `${pathName}.${key}`);
+    if (error) return error;
+  }
+  return null;
+}
+function collectExternalImageUrls(value, found = new Set(), key = '') {
+  if (typeof value === 'string' && key === 'image' && /^https:\/\//i.test(value)) found.add(value);
+  else if (Array.isArray(value)) value.forEach((item) => collectExternalImageUrls(item, found));
+  else if (value && typeof value === 'object') Object.entries(value).forEach(([childKey, item]) => collectExternalImageUrls(item, found, childKey));
+  return [...found];
+}
+async function validateContent(slug, content) {
   const serialized = safeJson(content);
   if (serialized.length > 2 * 1024 * 1024) return 'Content payload is too large.';
+  const structuredImageError = validateStructuredImages(content);
+  if (structuredImageError) return `${structuredImageError} on ${slug}.`;
+  const externalImageUrls = collectExternalImageUrls(content);
+  if (Array.isArray(content?.elements)) content.elements.forEach((element) => { if (element?.kind === 'image' && /^https:\/\//i.test(element.value || '')) externalImageUrls.push(element.value); });
+  for (const url of new Set(externalImageUrls)) {
+    try { await assertSafeRemoteDestination(url); } catch (error) { return `External image URL is not allowed on ${slug}: ${error.message}`; }
+  }
   if (!Array.isArray(content?.elements)) return null;
   for (const [index, element] of content.elements.entries()) {
     const field = element?.field_id || `legacy element ${index + 1}`;
@@ -208,7 +235,7 @@ function validateContent(slug, content) {
     if (element.field_id && !registered && !element.field_id.startsWith(`${slug}.legacy.`)) return `Invalid editable field ${field} on ${slug}: field is not registered for this page.`;
     if (registered && registered.kind !== element.kind) return `Invalid editable field ${field} on ${slug}: expected a ${registered.kind} field.`;
     if (typeof element.value !== 'string') return `Invalid editable field ${field} on ${slug}: value must be text.`;
-    if (element.kind === 'image' && element.value && !SAFE_IMAGE.test(element.value)) return `Invalid editable field ${field} on ${slug}: image reference is not allowed.`;
+    if (element.kind === 'image' && element.value && (!SAFE_IMAGE.test(element.value) || validateImageReference(element.value))) return `Invalid editable field ${field} on ${slug}: image reference is not allowed.`;
     if (element.href && (typeof element.href !== 'string' || !SAFE_HREF.test(element.href))) return `Invalid editable field ${field} on ${slug}: link must be an approved internal or external URL.`;
     if (element.alt !== undefined && typeof element.alt !== 'string') return `Invalid editable field ${field} on ${slug}: alt text must be text.`;
     if (element.position && !['center', 'top', 'bottom', 'left', 'right'].includes(element.position)) return `Invalid editable field ${field} on ${slug}: image position is invalid.`;
@@ -246,7 +273,7 @@ app.get('/api/pages/:slug', requireAuth, async (req, res, next) => {
 app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
   try {
     if (!req.body || typeof req.body.content !== 'object') return res.status(400).json({ error: 'A content object is required.' });
-    const validationError = validateContent(req.params.slug, req.body.content);
+    const validationError = await validateContent(req.params.slug, req.body.content);
     if (validationError) return res.status(400).json({ error: validationError });
     const language = req.body.language === 'sw' ? 'sw' : 'en';
     const result = await saveContent(pool, req.params.slug, 'draft', req.body.content, req.user.id, language);
@@ -307,15 +334,34 @@ app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upl
   try {
     if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
     if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: 'BLOB_PRIVATE_READ_WRITE_TOKEN is required before uploading an image.' });
-    const dimensions = imageSize(req.file.buffer);
+    let inspected;
+    try { inspected = inspectImageBuffer(req.file.buffer, req.file.mimetype); } catch (error) { return res.status(400).json({ error: error.message }); }
     const id = crypto.randomUUID();
     const { put } = require('@vercel/blob');
-    const blob = await put(`private/${id}${path.extname(req.file.originalname).toLowerCase()}`, req.file.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: req.file.mimetype });
+    const blob = await put(`private/${id}${inspected.extension}`, req.file.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: inspected.mimeType });
     assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
     await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, req.file.originalname, blob.pathname || blob.url, req.file.mimetype, req.file.size, dimensions.width || null, dimensions.height || null, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, req.file.originalname, blob.pathname || blob.url, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
     audit(req, 'media.upload', id, { filename: req.file.originalname });
-    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: req.file.mimetype, file_size: req.file.size, width: dimensions.width || null, height: dimensions.height || null, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+  } catch (error) { next(error); }
+});
+app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  try {
+    const sourceUrl = String(req.body?.url || '').trim();
+    if (!sourceUrl) return res.status(400).json({ error: 'An HTTPS image URL is required.' });
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: 'BLOB_PRIVATE_READ_WRITE_TOKEN is required before importing an image.' });
+    let imported;
+    try { imported = await fetchRemoteImage(sourceUrl); } catch (error) { return res.status(400).json({ error: error.message }); }
+    const id = crypto.randomUUID();
+    const { put } = require('@vercel/blob');
+    const blob = await put(`private/${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`, imported.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: imported.mimeType });
+    assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
+    const originalName = `remote-${imported.sourceHash}${IMAGE_EXTENSIONS.get(imported.mimeType)}`;
+    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, originalName, blob.pathname || blob.url, imported.mimeType, imported.fileSize, imported.width, imported.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
+    audit(req, 'media.import', id, { source: imported.sourceUrl, mimeType: imported.mimeType, fileSize: imported.fileSize });
+    res.status(201).json({ media: { id, original_name: originalName, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) { next(error); }
 });
 app.get('/api/media/:id/file', requireAuth, async (req, res, next) => {
@@ -355,7 +401,11 @@ app.get('/admin/', (_req, res) => res.set('Cache-Control', 'no-cache, must-reval
 app.use('/admin', express.static(path.join(ROOT, 'admin'), { setHeaders: frontendAssetHeaders }));
 app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
 app.use(express.static(ROOT, { extensions: ['html'], index: false, setHeaders: frontendAssetHeaders }));
-app.use((error, _req, res, _next) => { console.error(error); res.status(error.statusCode || 500).json({ error: error.message || 'Request failed.' }); });
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  const status = error?.code === 'LIMIT_FILE_SIZE' ? 413 : error instanceof multer.MulterError ? 400 : error.statusCode || 500;
+  res.status(status).json({ error: error.message || 'Request failed.' });
+});
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 3000);

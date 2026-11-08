@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const cmsFields = require('../cms-fields.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const databaseFile = path.join(ROOT, 'data', 'ecopower-smoke.sqlite');
@@ -74,6 +75,17 @@ async function main() {
     result = await request('/api/pages/home');
     assert.equal(result.response.status, 200, 'authenticated Home editor endpoint should work');
 
+    const invalidUpload = new FormData();
+    invalidUpload.append('file', new Blob([Buffer.from('not an image')], { type: 'image/png' }), 'invalid.png');
+    result = await request('/api/media', { method: 'POST', body: invalidUpload });
+    assert.equal(result.response.status, 400, 'invalid image uploads should be rejected with a clear client error');
+    for (const [url, message] of [['http://example.com/image.png', 'unsafe protocols'], ['https://127.0.0.1/image.png', 'private-network image URLs'], ['https://example.com/image.exe', 'unsupported external image types'], ['https://example.invalid/image.png', 'unavailable external images']]) {
+      result = await request('/api/media/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) });
+      assert.equal(result.response.status, 400, `${message} should be rejected gracefully`);
+    }
+    result = await request('/api/pages/home/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: { hero: { image: 'https://127.0.0.1/image.png' } } }) });
+    assert.equal(result.response.status, 400, 'drafts should reject private-network external image destinations');
+
     const imageNames = fs.readdirSync(path.join(ROOT, 'EcoPower_all_extracted_images')).filter((name) => /\.(jpe?g|png|webp)$/i.test(name)).sort();
     assertOk(imageNames.length >= 3, 'at least three real source images should exist for image publishing tests');
     const heroImage = await uploadSourceImage(imageNames[0]);
@@ -139,7 +151,8 @@ async function main() {
     assert.equal(result.response.status, 200, 'Restore should copy a published revision into the draft');
     assert.equal(result.body.draft.en.content.hero.en.title, 'Smoke-test headline', 'restored draft should contain the prior published text');
 
-    const productPageDraft = { elements: [{ kind: 'text', selector: 'main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', index: 0, tag: 'h1', value: 'Smoke-test Products heading' }, { kind: 'image', selector: 'main img, footer img', index: 0, tag: 'img', value: `media:${mediaId}`, alt: 'Smoke-test product image' }] };
+    const productsImageDefinition = cmsFields.get('products').find((definition) => definition.kind === 'image');
+    const productPageDraft = { elements: [{ kind: 'text', selector: 'main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', index: 0, tag: 'h1', value: 'Smoke-test Products heading' }, { field_id: productsImageDefinition.id, kind: 'image', selector: 'main img, footer img', index: 0, tag: 'img', value: `media:${mediaId}`, alt: 'Smoke-test product image' }] };
     result = await request('/api/pages/products/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: productPageDraft }) });
     assert.equal(result.response.status, 200, 'a non-Home page editor should save a draft');
     result = await request('/api/pages/products/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
@@ -149,14 +162,15 @@ async function main() {
     assertOk(result.body.published.en.content.elements[1].value.startsWith('/uploads/published/'), 'non-Home published images should be materialized');
 
     for (const slug of ['about', 'team', 'impact', 'partners', 'faq', 'contact']) {
-      const pageDraft = { elements: [{ kind: 'text', selector: 'main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', index: 0, tag: 'h1', group: 'smoke', groupLabel: 'Smoke section', value: `Smoke-test ${slug} heading` }, { kind: 'image', selector: 'main img, footer img', index: 0, tag: 'img', group: 'smoke', groupLabel: 'Smoke section', value: `media:${mediaId}`, alt: `Smoke-test ${slug} image`, position: 'center' }] };
+      const imageDefinition = cmsFields.get(slug).find((definition) => definition.kind === 'image');
+      const pageDraft = { elements: [{ kind: 'text', selector: 'main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', index: 0, tag: 'h1', group: 'smoke', groupLabel: 'Smoke section', value: `Smoke-test ${slug} heading` }, ...(imageDefinition ? [{ field_id: imageDefinition.id, kind: 'image', selector: 'main img, footer img', index: 0, tag: 'img', group: 'smoke', groupLabel: 'Smoke section', value: `media:${mediaId}`, alt: `Smoke-test ${slug} image`, position: 'center' }] : [])] };
       result = await request(`/api/pages/${slug}/draft`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: pageDraft }) });
       assert.equal(result.response.status, 200, `${slug} should save a draft`);
       result = await request(`/api/pages/${slug}/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
       assert.equal(result.response.status, 200, `${slug} should publish a draft`);
       result = await request(`/api/public/${slug}`);
       assert.equal(result.body.published.en.content.elements[0].value, `Smoke-test ${slug} heading`, `${slug} should expose published content`);
-      assertOk(result.body.published.en.content.elements[1].value.startsWith('/uploads/published/'), `${slug} should expose a published image URL`);
+      if (imageDefinition) assertOk(result.body.published.en.content.elements[1].value.startsWith('/uploads/published/'), `${slug} should expose a published image URL for ${imageDefinition.id}`);
     }
 
     result = await request('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'contact', name: 'Smoke Customer', phone: '0784 017 225', message: 'Smoke-test enquiry' }) });

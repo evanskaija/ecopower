@@ -144,6 +144,17 @@ button { cursor: pointer; }
 .upload-row { display: flex; align-items: center; gap: 12px; padding: 15px 24px; border-bottom: 1px solid var(--admin-line); color: var(--admin-muted); font-size: 9px; }
 .upload-button { display: inline-flex; min-height: 34px; align-items: center; padding: 9px 12px; border-radius: 7px; background: var(--admin-green); color: #fff; font-size: 10px; font-weight: 800; cursor: pointer; }
 .upload-button input { display: none; }
+.upload-button.is-busy { opacity: .65; cursor: wait; }
+.media-url-row { display: grid; gap: 7px; padding: 14px 24px 16px; border-bottom: 1px solid var(--admin-line); }
+.media-url-label { color: var(--admin-ink); font-size: 10px; font-weight: 800; }
+.media-url-controls { display: flex; align-items: center; gap: 8px; }
+.media-url-controls .field-input { flex: 1; min-width: 0; }
+.media-url-controls .admin-button { min-height: 36px; white-space: nowrap; }
+.media-url-row small, .media-upload-status { margin: 0; color: var(--admin-muted); font-size: 9px; line-height: 1.45; }
+.media-upload-status { min-height: 15px; padding: 10px 24px 0; }
+.media-upload-status.is-error { color: #be3d46; }
+.media-upload-status.is-success { color: var(--admin-green); }
+.media-upload-status.is-busy { color: var(--admin-forest); }
 .media-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 24px 25px; }
 .media-card { position: relative; overflow: hidden; padding: 0; border: 1px solid var(--admin-line); border-radius: 9px; background: #fff; text-align: left; }
 .media-card:hover, .media-card.selected { border-color: var(--admin-green); box-shadow: 0 0 0 3px rgba(25,175,105,.12); }
@@ -166,6 +177,11 @@ button { cursor: pointer; }
   .admin-content { padding-left: 24px; padding-right: 24px; }
   .admin-workspace { grid-template-columns: 310px minmax(0, 1fr); }
   .preview-controls > span { display: none; }
+}
+
+@media (max-width: 560px) {
+  .media-url-controls { align-items: stretch; flex-direction: column; }
+  .media-url-controls .admin-button { width: 100%; }
 }
 
 @media (max-width: 850px) {

@@ -10,9 +10,9 @@ const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
-const { imageSize: sizeOf } = require('image-size');
 const cmsFields = require('./cms-fields.js');
 const Database = require('better-sqlite3');
+const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, validateImageReference } = require('./media-security.js');
 
 const ROOT = __dirname;
 const DATA_DIR = path.resolve(ROOT, 'data');
@@ -20,8 +20,6 @@ const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(ROOT, 'uploa
 const PRIVATE_UPLOAD_DIR = path.join(UPLOAD_DIR, 'private');
 const PUBLISHED_UPLOAD_DIR = path.join(UPLOAD_DIR, 'published');
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
 const PAGES = [
   ['home', 'Home'], ['products', 'Products and Prices'], ['about', 'About Us'], ['team', 'Our Team'],
   ['impact', 'Our Results'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
@@ -229,10 +227,39 @@ function audit(req, action, target, metadata = {}) {
 
 const EDITABLE_SELECTORS = new Set(['main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', 'main img, footer img']);
 const SAFE_HREF = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i;
-const SAFE_IMAGE = /^(?:media:[a-f0-9-]+|https?:\/\/[^\s]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
-function validateContent(slug, content) {
+const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
+function validateStructuredImages(value, pathName = 'content') {
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const error = validateStructuredImages(item, `${pathName}.${index}`);
+      if (error) return error;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  for (const [key, item] of Object.entries(value)) {
+    if (key === 'image' && typeof item === 'string' && item && (!SAFE_IMAGE.test(item) || validateImageReference(item))) return `Invalid image reference at ${pathName}.${key}.`;
+    const error = validateStructuredImages(item, `${pathName}.${key}`);
+    if (error) return error;
+  }
+  return null;
+}
+function collectExternalImageUrls(value, found = new Set(), key = '') {
+  if (typeof value === 'string' && key === 'image' && /^https:\/\//i.test(value)) found.add(value);
+  else if (Array.isArray(value)) value.forEach((item) => collectExternalImageUrls(item, found));
+  else if (value && typeof value === 'object') Object.entries(value).forEach(([childKey, item]) => collectExternalImageUrls(item, found, childKey));
+  return [...found];
+}
+async function validateContent(slug, content) {
   const serialized = safeJson(content);
   if (serialized.length > 2 * 1024 * 1024) return 'Content payload is too large.';
+  const structuredImageError = validateStructuredImages(content);
+  if (structuredImageError) return `${structuredImageError} on ${slug}.`;
+  const externalImageUrls = collectExternalImageUrls(content);
+  if (Array.isArray(content?.elements)) content.elements.forEach((element) => { if (element?.kind === 'image' && /^https:\/\//i.test(element.value || '')) externalImageUrls.push(element.value); });
+  for (const url of new Set(externalImageUrls)) {
+    try { await assertSafeRemoteDestination(url); } catch (error) { return `External image URL is not allowed on ${slug}: ${error.message}`; }
+  }
   if (!Array.isArray(content?.elements)) return null;
   for (const [index, element] of content.elements.entries()) {
     const field = element?.field_id || `legacy element ${index + 1}`;
@@ -243,7 +270,7 @@ function validateContent(slug, content) {
     if (element.field_id && !registered && !element.field_id.startsWith(`${slug}.legacy.`)) return `Invalid editable field ${field} on ${slug}: field is not registered for this page.`;
     if (registered && registered.kind !== element.kind) return `Invalid editable field ${field} on ${slug}: expected a ${registered.kind} field.`;
     if (typeof element.value !== 'string') return `Invalid editable field ${field} on ${slug}: value must be text.`;
-    if (element.kind === 'image' && element.value && !SAFE_IMAGE.test(element.value)) return `Invalid editable field ${field} on ${slug}: image reference is not allowed.`;
+    if (element.kind === 'image' && element.value && (!SAFE_IMAGE.test(element.value) || validateImageReference(element.value))) return `Invalid editable field ${field} on ${slug}: image reference is not allowed.`;
     if (element.href && (typeof element.href !== 'string' || !SAFE_HREF.test(element.href))) return `Invalid editable field ${field} on ${slug}: link must be an approved internal or external URL.`;
     if (element.alt !== undefined && typeof element.alt !== 'string') return `Invalid editable field ${field} on ${slug}: alt text must be text.`;
     if (element.position && !['center', 'top', 'bottom', 'left', 'right'].includes(element.position)) return `Invalid editable field ${field} on ${slug}: image position is invalid.`;
@@ -274,11 +301,11 @@ app.get('/api/pages/:slug', requireAuth, (req, res) => {
   res.json({ page, draft: allContent(req.params.slug, 'draft'), published: allContent(req.params.slug, 'published'), revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(pageId(req.params.slug)) });
 });
 
-app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), (req, res) => {
+app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res) => {
   if (!req.body || typeof req.body.content !== 'object') return res.status(400).json({ error: 'A content object is required.' });
   const serialized = safeJson(req.body.content);
   if (serialized.length > 2 * 1024 * 1024) return res.status(413).json({ error: 'Content payload is too large.' });
-  const validationError = validateContent(req.params.slug, req.body.content);
+  const validationError = await validateContent(req.params.slug, req.body.content);
   if (validationError) return res.status(400).json({ error: validationError });
   const language = req.body.language === 'sw' ? 'sw' : 'en';
   const result = saveContent(req.params.slug, 'draft', req.body.content, req.user.id, language);
@@ -293,20 +320,21 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
     const drafts = allContent(req.params.slug, 'draft');
     const languages = Object.keys(drafts);
     if (!languages.length) return res.status(400).json({ error: 'Save a draft before publishing.' });
-    const publishTransaction = db.transaction(() => {
-      for (const language of languages) {
-        const draft = drafts[language];
-        const current = currentContent(req.params.slug, 'published', language);
-        if (current) db.prepare('INSERT INTO content_revisions (page_id, language, version, content_json, created_by) VALUES (?, ?, ?, ?, ?)').run(page.id, language, current.version, safeJson(current.content), req.user.id);
-      }
-    });
+    const materialized = {};
     for (const language of languages) {
       const draft = drafts[language];
       const content = await materializeMedia(draft.content);
       const unresolved = collectMediaMarkers(content);
       if (unresolved.length) throw new Error(`Publishing stopped: unresolved media reference(s): ${unresolved.join(', ')}`);
-      saveContent(req.params.slug, 'published', content, req.user.id, language);
+      materialized[language] = content;
     }
+    const publishTransaction = db.transaction(() => {
+      for (const language of languages) {
+        const current = currentContent(req.params.slug, 'published', language);
+        if (current) db.prepare('INSERT INTO content_revisions (page_id, language, version, content_json, created_by) VALUES (?, ?, ?, ?, ?)').run(page.id, language, current.version, safeJson(current.content), req.user.id);
+        saveContent(req.params.slug, 'published', materialized[language], req.user.id, language);
+      }
+    });
     publishTransaction();
     audit(req, 'publish', req.params.slug, { languages });
     res.json({ ok: true, published: allContent(req.params.slug, 'published'), revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(page.id) });
@@ -340,25 +368,50 @@ app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upl
   if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
   try {
     const buffer = process.env.NODE_ENV === 'production' ? req.file.buffer : fs.readFileSync(req.file.path);
-    const dimensions = sizeOf(buffer);
+    const inspected = inspectImageBuffer(buffer, req.file.mimetype);
     const id = crypto.randomUUID();
     let storagePath;
     if (process.env.NODE_ENV === 'production') {
       if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error('BLOB_READ_WRITE_TOKEN is required before uploading an image in production.');
       const { put } = require('@vercel/blob');
-      const blob = await put(`private/${id}${path.extname(req.file.originalname).toLowerCase()}`, buffer, { access: 'private', addRandomSuffix: true, token: process.env.BLOB_READ_WRITE_TOKEN, contentType: req.file.mimetype });
+      const blob = await put(`private/${id}${inspected.extension}`, buffer, { access: 'private', addRandomSuffix: true, token: process.env.BLOB_READ_WRITE_TOKEN, contentType: inspected.mimeType });
       storagePath = blob.url;
     } else {
       storagePath = path.relative(ROOT, req.file.path);
     }
     db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, req.file.originalname, storagePath, req.file.mimetype, req.file.size, dimensions.width || null, dimensions.height || null, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, req.file.originalname, storagePath, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id);
     audit(req, 'media.upload', id, { filename: req.file.originalname });
-    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: req.file.mimetype, file_size: req.file.size, width: dimensions.width || null, height: dimensions.height || null, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) {
     if (req.file.path) fs.rmSync(req.file.path, { force: true });
     res.status(400).json({ error: `Could not read the uploaded image: ${error.message}` });
   }
+});
+app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res) => {
+  const sourceUrl = String(req.body?.url || '').trim();
+  if (!sourceUrl) return res.status(400).json({ error: 'An HTTPS image URL is required.' });
+  let imported;
+  try { imported = await fetchRemoteImage(sourceUrl); } catch (error) { return res.status(400).json({ error: error.message }); }
+  try {
+    const id = crypto.randomUUID();
+    let storagePath;
+    if (process.env.NODE_ENV === 'production') {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error('BLOB_READ_WRITE_TOKEN is required before importing an image.');
+      const { put } = require('@vercel/blob');
+      const blob = await put(`private/${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`, imported.buffer, { access: 'private', addRandomSuffix: true, token: process.env.BLOB_READ_WRITE_TOKEN, contentType: imported.mimeType });
+      storagePath = blob.url;
+    } else {
+      const localPath = path.join(PRIVATE_UPLOAD_DIR, `${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`);
+      await fs.promises.writeFile(localPath, imported.buffer);
+      storagePath = path.relative(ROOT, localPath);
+    }
+    const originalName = `remote-${imported.sourceHash}${IMAGE_EXTENSIONS.get(imported.mimeType)}`;
+    db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, originalName, storagePath, imported.mimeType, imported.fileSize, imported.width, imported.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id);
+    audit(req, 'media.import', id, { source: imported.sourceUrl, mimeType: imported.mimeType, fileSize: imported.fileSize });
+    return res.status(201).json({ media: { id, original_name: originalName, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+  } catch (error) { return res.status(500).json({ error: error.message || 'The image could not be imported.' }); }
 });
 
 app.get('/api/media/:id/file', requireAuth, async (req, res) => {

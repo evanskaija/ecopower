@@ -26,6 +26,7 @@ a { color: inherit; text-decoration: none; }
 button, input, select, textarea { color: inherit; font: inherit; }
 button { cursor: pointer; }
 img { display: block; max-width: 100%; }
+.cms-image-unavailable { opacity: .48; background: #e8eee9; }
 figure, blockquote { margin: 0; }
 h1, h2, h3, h4, p { margin-top: 0; }
 h1, h2, h3, h4 { font-family: Manrope, Inter, sans-serif; line-height: 1.06; }

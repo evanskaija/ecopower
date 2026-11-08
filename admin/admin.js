@@ -140,6 +140,9 @@
   let toastTimer;
   let currentUser = null;
   let draftSaveTimer = null;
+  let draftSavePromise = null;
+  let draftSaveRevision = 0;
+  let draftChangeVersion = 0;
   let loadingRemoteState = false;
 
   const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
@@ -177,6 +180,33 @@
     toast.classList.add('is-visible');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 3200);
+  }
+
+  function setCmsBusy(busy) {
+    document.querySelectorAll('[data-action="save-draft"], [data-action="publish"]').forEach((button) => {
+      button.disabled = busy;
+      button.setAttribute('aria-busy', String(busy));
+    });
+  }
+
+  function setMediaBusy(busy, message = '') {
+    setCmsBusy(busy);
+    const upload = $('#media-upload');
+    const uploadLabel = upload?.closest('.upload-button');
+    const urlForm = $('#media-url-form');
+    const urlButton = urlForm?.querySelector('button[type="submit"]');
+    if (upload) upload.disabled = busy;
+    if (uploadLabel) uploadLabel.classList.toggle('is-busy', busy);
+    if (urlButton) { urlButton.disabled = busy; urlButton.setAttribute('aria-busy', String(busy)); }
+    const status = $('#media-upload-status');
+    if (status && message) { status.textContent = message; status.className = `media-upload-status ${busy ? 'is-busy' : ''}`; }
+  }
+
+  function setMediaStatus(message, kind = '') {
+    const status = $('#media-upload-status');
+    if (!status) return;
+    status.textContent = message;
+    status.className = `media-upload-status${kind ? ` is-${kind}` : ''}`;
   }
 
   function updateLastUpdated(value) {
@@ -411,38 +441,63 @@
 
   async function saveDraftRemote(showMessage = true) {
     if (!currentUser || loadingRemoteState) return false;
+    if (draftSavePromise) {
+      const pendingRevision = draftSaveRevision;
+      const pendingResult = await draftSavePromise;
+      if (draftChangeVersion === pendingRevision) return pendingResult;
+    }
     clearTimeout(draftSaveTimer);
     const status = $('#draft-status');
     status.textContent = 'Saving draft…';
     status.classList.remove('is-saved');
-    try {
-      const result = await apiRequest(`/api/pages/${activePage}/draft`, { method: 'PUT', body: JSON.stringify({ content: currentDraft(), language }) });
-      if (activePage === 'home') {
-        state.draftRecords = result.draft || state.draftRecords;
-        const savedContent = state.draftRecords?.[language]?.content;
-        if (savedContent) state.draft = clone(savedContent);
-      } else {
-        const pageState = genericState();
-        if (pageState) {
-          pageState.draftRecords = result.draft || pageState.draftRecords;
-          pageState.draftByLanguage[language] = pageState.draftRecords?.[language]?.content || currentDraft();
+    const pageAtStart = activePage;
+    const languageAtStart = language;
+    const revisionAtStart = draftChangeVersion;
+    const contentSnapshot = clone(currentDraft());
+    draftSaveRevision = revisionAtStart;
+    const operation = (async () => {
+      setCmsBusy(true);
+      try {
+        const result = await apiRequest(`/api/pages/${pageAtStart}/draft`, { method: 'PUT', body: JSON.stringify({ content: contentSnapshot, language: languageAtStart }) });
+        // Do not overwrite a newer keystroke/image choice with the response to
+        // an older request. A later save below will persist the new snapshot.
+        if (draftChangeVersion === revisionAtStart && activePage === pageAtStart && language === languageAtStart) {
+          if (pageAtStart === 'home') {
+            state.draftRecords = result.draft || state.draftRecords;
+            const savedContent = state.draftRecords?.[languageAtStart]?.content;
+            if (savedContent) state.draft = clone(savedContent);
+          } else {
+            const pageState = genericState(pageAtStart);
+            if (pageState) {
+              pageState.draftRecords = result.draft || pageState.draftRecords;
+              pageState.draftByLanguage[languageAtStart] = pageState.draftRecords?.[languageAtStart]?.content || contentSnapshot;
+            }
+          }
+          status.textContent = 'Draft saved successfully';
+          status.classList.add('is-saved');
+          updateLastUpdated(result.draft?.[languageAtStart]?.updated_at || new Date().toISOString());
+          renderSectionList();
+          updatePreview();
+          if (showMessage) showToast('Draft saved successfully. Your changes are not yet public.');
         }
+        return true;
+      } catch (error) {
+        status.textContent = 'Draft save failed';
+        showToast(error.message);
+        return false;
+      } finally {
+        setCmsBusy(false);
       }
-      status.textContent = 'Draft saved successfully';
-      status.classList.add('is-saved');
-      updateLastUpdated(result.draft?.[language]?.updated_at || new Date().toISOString());
-      renderSectionList();
-      updatePreview();
-      if (showMessage) showToast('Draft saved successfully. Your changes are not yet public.');
-      return true;
-    } catch (error) {
-      status.textContent = 'Draft save failed';
-      showToast(error.message);
-      return false;
-    }
+    })();
+    draftSavePromise = operation;
+    let saved;
+    try { saved = await operation; } finally { if (draftSavePromise === operation) draftSavePromise = null; }
+    if (saved && draftChangeVersion !== revisionAtStart) return saveDraftRemote(showMessage);
+    return saved;
   }
 
   function persistDraft(showMessage = true) {
+    draftChangeVersion += 1;
     renderSectionList();
     updatePreview();
     const status = $('#draft-status');
@@ -467,6 +522,18 @@
     const name = state.media.find((item) => item.src === safeValue)?.name || safeValue.split('/').pop() || 'No image selected';
     const position = options.positionPath ? getAt(state.draft[activeSection], options.positionPath) || 'center' : null;
     return `<div class="field-group"><label>${label}</label><div class="media-picker"><img src="${assetUrl(safeValue)}" alt="" style="object-position:${position || 'center'}" /><div class="media-picker-info"><strong>${escapeHtml(name)}</strong><small>Click to replace or reposition</small><button type="button" data-action="media" data-path="${path}">Change image</button></div></div>${options.positionPath ? selectField('Image position', options.positionPath, position, { choices: ['center', 'top', 'bottom', 'left', 'right'] }) : ''}</div>`;
+  }
+
+  function updateMediaPicker(path, src) {
+    const form = $('#section-form');
+    const button = [...(form?.querySelectorAll('[data-action="media"]') || [])].find((item) => item.dataset.path === path);
+    const picker = button?.closest('.media-picker');
+    if (!picker) return;
+    const image = picker.querySelector('img');
+    const name = state.media.find((item) => item.src === src)?.name || src.split('/').pop() || 'No image selected';
+    if (image) image.src = assetUrl(src);
+    const label = picker.querySelector('strong');
+    if (label) label.textContent = name;
   }
 
   function renderHero(section) {
@@ -643,6 +710,10 @@
 
   function openMedia(section, path) {
     mediaTarget = { section, path };
+    $('#media-upload').value = '';
+    $('#media-url').value = '';
+    setMediaStatus('');
+    setMediaBusy(false);
     renderMedia();
     $('#media-backdrop').hidden = false;
     $('#media-modal').hidden = false;
@@ -692,6 +763,7 @@
 
   async function publish() {
     if (!window.confirm(`Publish the current ${pageMeta[activePage].label} draft? The public page will use this version.`)) return;
+    setCmsBusy(true);
     try {
       const saved = await saveDraftRemote(false);
       if (!saved) throw new Error('Publish cancelled because the latest draft could not be saved.');
@@ -719,6 +791,8 @@
       showToast('Published successfully. Your website has been updated.');
     } catch (error) {
       showToast(`Publish failed: ${error.message}`);
+    } finally {
+      setCmsBusy(false);
     }
   }
 
@@ -786,9 +860,13 @@
     if (action === 'media') openMedia(activeSection, target.dataset.path);
     if (action === 'close-media') closeMedia();
     if (action === 'select-media' && mediaTarget) {
-      setAt(activePage === 'home' ? state.draft[mediaTarget.section] : genericContent(), mediaTarget.path, target.dataset.src);
+      const targetSection = mediaTarget.section;
+      const targetPath = mediaTarget.path;
+      const selectedSrc = target.dataset.src;
+      setAt(activePage === 'home' ? state.draft[targetSection] : genericContent(), targetPath, selectedSrc);
+      draftChangeVersion += 1;
       closeMedia();
-      renderForm();
+      updateMediaPicker(targetPath, selectedSrc);
       updatePreview();
       // Image selection is a content change. Persist it immediately so a
       // page switch, refresh, or publish cannot race the debounced text save.
@@ -814,28 +892,70 @@
     if (event.data?.type === 'ecopower-cms-preview-ready') sendPreview();
   });
   $('#preview-frame').addEventListener('load', () => { sendPreview(); setTimeout(bindPreviewClicks, 250); });
+
+  function uploadMediaWithProgress(formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('POST', '/api/media');
+      request.withCredentials = true;
+      request.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+      });
+      request.addEventListener('load', () => {
+        let data;
+        try { data = request.responseText ? JSON.parse(request.responseText) : null; } catch { data = null; }
+        if (request.status < 200 || request.status >= 300) return reject(new Error(data?.error || `Upload failed with status ${request.status}.`));
+        return resolve(data?.media);
+      });
+      request.addEventListener('error', () => reject(new Error('The image upload could not reach the CMS.')));
+      request.addEventListener('timeout', () => reject(new Error('The image upload timed out.')));
+      request.timeout = 120000;
+      request.send(formData);
+    });
+  }
+
+  async function assignUploadedMedia(uploaded, targetSection, targetPath, successMessage) {
+    const item = { ...uploaded, name: uploaded.original_name, uploaded: true };
+    state.media.unshift(item);
+    setAt(activePage === 'home' ? state.draft[targetSection] : genericContent(), targetPath, item.src);
+    draftChangeVersion += 1;
+    closeMedia();
+    updateMediaPicker(targetPath, item.src);
+    updatePreview();
+    const saved = await saveDraftRemote(true);
+    if (saved) showToast(successMessage);
+  }
+
   $('#media-upload').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
     if (!file || !mediaTarget) return;
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) { showToast('Please upload a JPEG, PNG, WebP or AVIF image.'); return; }
-    if (file.size > 8 * 1024 * 1024) { showToast('Image must be smaller than 8 MB in this local editor.'); return; }
-    const reader = new FileReader();
+    if (file.size > 10 * 1024 * 1024) { showToast('Image must be smaller than 10 MB.'); return; }
     const targetSection = mediaTarget.section;
     const targetPath = mediaTarget.path;
     const formData = new FormData();
     formData.append('file', file);
-    fetch('/api/media', { method: 'POST', credentials: 'same-origin', body: formData }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Upload failed.'); return data.media; }).then((uploaded) => {
-      const item = { ...uploaded, name: uploaded.original_name, uploaded: true };
-      state.media.unshift(item);
-      setAt(activePage === 'home' ? state.draft[targetSection] : genericContent(), targetPath, item.src);
-      closeMedia();
-      renderForm();
-      updatePreview();
-      // Uploads are private until publish, but the assignment must be durable
-      // before the admin can leave the editor or trigger another action.
-      void saveDraftRemote(true);
-      showToast('Image uploaded to the private media library and added to the draft.');
-    }).catch((error) => showToast(`Upload failed: ${error.message}`));
+    setMediaBusy(true, 'Uploading image… 0%');
+    uploadMediaWithProgress(formData, (percent) => setMediaBusy(true, `Uploading image… ${percent}%`)).then((uploaded) => assignUploadedMedia(uploaded, targetSection, targetPath, 'Image uploaded, saved to the draft, and ready to publish.')).catch((error) => { setMediaStatus(`Upload failed: ${error.message}`, 'error'); showToast(`Upload failed: ${error.message}`); }).finally(() => { setMediaBusy(false); event.target.value = ''; });
+  });
+
+  $('#media-url-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!mediaTarget) return;
+    const sourceUrl = $('#media-url').value.trim();
+    if (!sourceUrl) return;
+    const targetSection = mediaTarget.section;
+    const targetPath = mediaTarget.path;
+    setMediaBusy(true, 'Validating and importing image…');
+    try {
+      const result = await apiRequest('/api/media/import', { method: 'POST', body: JSON.stringify({ url: sourceUrl }) });
+      await assignUploadedMedia(result.media, targetSection, targetPath, 'External image imported, saved to the draft, and ready to publish.');
+    } catch (error) {
+      setMediaStatus(`Import failed: ${error.message}`, 'error');
+      showToast(`Import failed: ${error.message}`);
+    } finally {
+      setMediaBusy(false);
+    }
   });
 
   $('#login-form').addEventListener('submit', async (event) => {

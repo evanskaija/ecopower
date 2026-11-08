@@ -115,10 +115,11 @@ h1, h2, h3 { letter-spacing: -.045em; }
 .price-panel-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 .trust-strip { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: -1px; padding: 0; border: 1px solid var(--line); border-top: 0; background: var(--white); }
-.trust-item { display: flex; flex-direction: column; justify-content: center; min-height: 104px; padding: 17px 25px; border-right: 1px solid var(--line); }
+.trust-item { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 14px; align-content: center; min-height: 104px; padding: 17px 25px; border-right: 1px solid var(--line); }
 .trust-item:last-child { border-right: 0; }
-.trust-item strong { color: var(--forest); font-family: Manrope, sans-serif; font-size: 16px; }
-.trust-item span { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.trust-icon { grid-row: 1 / span 2; align-self: center; width: 25px; height: 25px; color: var(--fresh); stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.trust-item strong { grid-column: 2; color: var(--forest); font-family: Manrope, sans-serif; font-size: 16px; line-height: 1.25; }
+.trust-item span { grid-column: 2; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 
 .section { padding: 126px 0; }
 .section-tight { padding: 88px 0; }

@@ -1,0 +1,365 @@
+require('dotenv').config();
+
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { Readable } = require('node:stream');
+const express = require('express');
+const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const multer = require('multer');
+const { imageSize } = require('image-size');
+const cmsFields = require('./cms-fields.js');
+
+const ROOT = __dirname;
+const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+const VERCEL_ENV = process.env.VERCEL_ENV || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
+const BLOB_ENV_PREFIX = VERCEL_ENV === 'preview' ? 'ECOPOWER_PREVIEW' : VERCEL_ENV === 'production' ? 'ECOPOWER_PRODUCTION' : '';
+const privateTokenName = BLOB_ENV_PREFIX ? `${BLOB_ENV_PREFIX}_PRIVATE_READ_WRITE_TOKEN` : 'BLOB_PRIVATE_READ_WRITE_TOKEN';
+const publicTokenName = BLOB_ENV_PREFIX ? `${BLOB_ENV_PREFIX}_PUBLIC_READ_WRITE_TOKEN` : 'BLOB_PUBLIC_READ_WRITE_TOKEN';
+const privateStoreIdName = BLOB_ENV_PREFIX ? `${BLOB_ENV_PREFIX}_PRIVATE_STORE_ID` : 'BLOB_PRIVATE_STORE_ID';
+const publicStoreIdName = BLOB_ENV_PREFIX ? `${BLOB_ENV_PREFIX}_PUBLIC_STORE_ID` : 'BLOB_PUBLIC_STORE_ID';
+const PRIVATE_BLOB_TOKEN = process.env[privateTokenName] || (VERCEL_ENV === 'development' ? process.env.BLOB_PRIVATE_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN : '');
+const PUBLIC_BLOB_TOKEN = process.env[publicTokenName] || (VERCEL_ENV === 'development' ? process.env.BLOB_PUBLIC_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN : '');
+const PRIVATE_BLOB_STORE_ID = process.env[privateStoreIdName] || '';
+const PUBLIC_BLOB_STORE_ID = process.env[publicStoreIdName] || '';
+const PAGES = [
+  ['home', 'Home'], ['products', 'Products and Prices'], ['about', 'About Us'], ['team', 'Our Team'],
+  ['impact', 'Our Results'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
+];
+
+if (!/^postgres(ql)?:\/\//i.test(DATABASE_URL)) throw new Error('DATABASE_URL must be a PostgreSQL connection string for the production entrypoint.');
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'development-only-change-this-secret') throw new Error('SESSION_SECRET must be configured before starting the PostgreSQL server.');
+if (VERCEL_ENV === 'production' && (process.env.ECOPOWER_PREVIEW_PRIVATE_READ_WRITE_TOKEN || process.env.ECOPOWER_PREVIEW_PUBLIC_READ_WRITE_TOKEN)) {
+  throw new Error('Preview Blob credentials are present in the Production deployment. Remove them and configure ECOPOWER_PRODUCTION_* Blob credentials instead.');
+}
+
+const pool = new Pool({ connectionString: DATABASE_URL, max: Number(process.env.PG_POOL_MAX || 5), ssl: process.env.PGSSL === 'disable' ? false : { rejectUnauthorized: false } });
+const app = express();
+app.set('trust proxy', 1);
+
+async function initializeDatabase() {
+  const client = await pool.connect();
+  const migrationLock = 'ecopower:postgres-migrations';
+  try {
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [migrationLock]);
+    await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+    const migrationFiles = fs.readdirSync(path.join(ROOT, 'migrations'))
+      .filter((file) => /^\d+_.*_postgres\.sql$/i.test(file))
+      .sort();
+    for (const migrationFile of migrationFiles) {
+      const alreadyApplied = await client.query('SELECT id FROM schema_migrations WHERE id = $1', [migrationFile]);
+      if (alreadyApplied.rowCount) continue;
+      const migration = fs.readFileSync(path.join(ROOT, 'migrations', migrationFile), 'utf8');
+      await client.query('BEGIN');
+      await client.query(migration);
+      await client.query('INSERT INTO schema_migrations (id) VALUES ($1)', [migrationFile]);
+      await client.query('COMMIT');
+    }
+    for (const [slug, name] of PAGES) {
+      const id = crypto.createHash('sha256').update(`page:${slug}`).digest('hex').slice(0, 24);
+      await client.query('INSERT INTO pages (id, slug, name, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (slug) DO NOTHING', [id, slug, name, PAGES.findIndex(([candidate]) => candidate === slug) + 1]);
+    }
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
+    throw error;
+  } finally {
+    try { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [migrationLock]); } catch {}
+    client.release();
+  }
+}
+
+const ready = initializeDatabase();
+app.use(async (_req, _res, next) => { try { await ready; next(); } catch (error) { next(error); } });
+app.disable('x-powered-by');
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// Keep public HTML, CSS, JavaScript and images available. Rate-limit the API
+// surface instead of the whole server so a preview or asset-heavy page cannot
+// turn the public site into an unstyled 429 response.
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
+app.use(session({
+  name: 'ecopower.sid',
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  store: new PgSession({ pool, tableName: 'user_sessions', createTableIfMissing: false }),
+  cookie: { httpOnly: true, sameSite: 'lax', secure: true, maxAge: 8 * 60 * 60 * 1000 }
+}));
+
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, message: { error: 'Too many login attempts. Try again later.' } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_SIZE, files: 1 }, fileFilter: (_req, file, callback) => callback(null, ALLOWED_IMAGE_TYPES.has(file.mimetype)) });
+
+const query = (executor, text, values = []) => executor.query(text, values);
+const db = { query: (text, values) => pool.query(text, values), pool };
+const nowIso = () => new Date().toISOString();
+const safeJson = (value) => JSON.stringify(value ?? {});
+const parseJson = (value) => typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return {}; } })() : (value || {});
+const cleanEmail = (value) => String(value || '').trim().toLowerCase();
+const publicUrlFor = (fileName) => `/uploads/published/${encodeURIComponent(fileName)}`;
+function blobPathname(value) {
+  const raw = String(value || '');
+  if (/^https?:\/\//i.test(raw)) return new URL(raw).pathname.replace(/^\/+/, '');
+  return raw.replace(/^\/+/, '');
+}
+function assertBlobStore(url, expectedStoreId, label) {
+  if (!expectedStoreId) return;
+  let hostname;
+  try { hostname = new URL(url).hostname.toLowerCase(); } catch { throw new Error(`${label} Blob returned an invalid URL.`); }
+  if (!hostname.startsWith(`${String(expectedStoreId).toLowerCase()}.`)) throw new Error(`${label} Blob store ID does not match the configured ${VERCEL_ENV} store.`);
+}
+
+async function pageId(executor, slug) { return (await query(executor, 'SELECT id FROM pages WHERE slug = $1', [slug])).rows[0]?.id; }
+async function currentContent(executor, slug, status, language) {
+  const id = await pageId(executor, slug);
+  if (!id) return null;
+  const row = (await query(executor, 'SELECT id, version, content_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
+  return row ? { id: row.id, version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at } : null;
+}
+async function allContent(executor, slug, status) {
+  const id = await pageId(executor, slug);
+  if (!id) return {};
+  const result = await query(executor, 'SELECT language, version, content_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2', [id, status]);
+  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at }]));
+}
+async function saveContent(executor, slug, status, content, userId, language = 'en') {
+  const id = await pageId(executor, slug);
+  if (!id) throw new Error('Unknown page.');
+  const existing = (await query(executor, 'SELECT version FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
+  const version = Number(existing?.version || 0) + 1;
+  await query(executor, `INSERT INTO page_content (page_id, language, status, content_json, version, created_by, updated_at)
+    VALUES ($1, $2, $3, $4::jsonb, $5, $6, CURRENT_TIMESTAMP)
+    ON CONFLICT(page_id, language, status) DO UPDATE SET content_json = EXCLUDED.content_json, version = EXCLUDED.version, created_by = EXCLUDED.created_by, updated_at = CURRENT_TIMESTAMP`, [id, language, status, safeJson(content), version, userId]);
+  return { version };
+}
+function collectMediaMarkers(value, found = new Set()) {
+  if (typeof value === 'string' && value.startsWith('media:')) found.add(value.slice(6));
+  else if (Array.isArray(value)) value.forEach((item) => collectMediaMarkers(item, found));
+  else if (value && typeof value === 'object') Object.values(value).forEach((item) => collectMediaMarkers(item, found));
+  return [...found];
+}
+async function publishMedia(mediaId) {
+  const asset = (await query(pool, 'SELECT * FROM media_assets WHERE id = $1', [mediaId])).rows[0];
+  if (!asset) throw new Error(`Media asset ${mediaId} was not found.`);
+  if (asset.public_url) {
+    const response = await fetch(asset.public_url, { method: 'HEAD', cache: 'no-store' });
+    if (!response.ok) throw new Error(`The published image for media asset ${mediaId} is not reachable (${response.status}).`);
+    return asset.public_url;
+  }
+  if (!PRIVATE_BLOB_TOKEN || !PUBLIC_BLOB_TOKEN) throw new Error(`${privateTokenName} and ${publicTokenName} are required before publishing an uploaded image.`);
+  const { get, put } = require('@vercel/blob');
+  const privateBlob = await get(blobPathname(asset.storage_path), { access: 'private', token: PRIVATE_BLOB_TOKEN, useCache: false });
+  if (!privateBlob || privateBlob.statusCode !== 200) throw new Error('The private Vercel Blob image could not be read.');
+  const fileBuffer = Buffer.from(await new Response(privateBlob.stream).arrayBuffer());
+  const extension = path.extname(blobPathname(asset.storage_path)) || '.bin';
+  const blob = await put(`published/${asset.id}${extension}`, fileBuffer, { access: 'public', addRandomSuffix: true, token: PUBLIC_BLOB_TOKEN, contentType: asset.mime_type, cacheControlMaxAge: 31536000 });
+  assertBlobStore(blob.url, PUBLIC_BLOB_STORE_ID, 'Public');
+  const verification = await fetch(blob.url, { method: 'HEAD', cache: 'no-store' });
+  if (!verification.ok) throw new Error(`The published Vercel Blob image could not be verified (${verification.status}).`);
+  await query(pool, 'UPDATE media_assets SET public_url = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3', [blob.url, 'published', asset.id]);
+  return blob.url;
+}
+async function materializeMedia(value) {
+  if (typeof value === 'string' && value.startsWith('media:')) return publishMedia(value.slice(6));
+  if (Array.isArray(value)) return Promise.all(value.map(materializeMedia));
+  if (value && typeof value === 'object') return Object.fromEntries(await Promise.all(Object.entries(value).map(async ([key, item]) => [key, await materializeMedia(item)])));
+  return value;
+}
+async function requireAuth(req, res, next) {
+  if (!req.session.user) return res.status(401).json({ error: 'Authentication required.' });
+  try {
+    const user = (await query(pool, 'SELECT id, email, role, active FROM admin_users WHERE id = $1', [req.session.user.id])).rows[0];
+    if (!user || !user.active) return req.session.destroy(() => res.status(401).json({ error: 'Session is no longer active.' }));
+    req.user = user;
+    next();
+  } catch (error) { next(error); }
+}
+function requireRole(...roles) { return (req, res, next) => roles.includes(req.user?.role) ? next() : res.status(403).json({ error: 'You do not have permission for this operation.' }); }
+function sameOrigin(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  const deploymentOrigin = process.env.VERCEL_URL ? `https://${String(process.env.VERCEL_URL).replace(/^https?:\/\//i, '')}` : '';
+  if (!origin || origin === PUBLIC_ORIGIN || origin === deploymentOrigin) return next();
+  return res.status(403).json({ error: 'Cross-origin request rejected.' });
+}
+function audit(req, action, target, metadata = {}) { console.log(JSON.stringify({ at: nowIso(), actor: req.user?.email || 'public', action, target, metadata })); }
+const EDITABLE_SELECTORS = new Set(['main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', 'main img, footer img']);
+const SAFE_HREF = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i;
+const SAFE_IMAGE = /^(?:media:[a-f0-9-]+|https?:\/\/[^\s]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
+function validateContent(slug, content) {
+  const serialized = safeJson(content);
+  if (serialized.length > 2 * 1024 * 1024) return 'Content payload is too large.';
+  if (!Array.isArray(content?.elements)) return null;
+  for (const [index, element] of content.elements.entries()) {
+    const field = element?.field_id || `legacy element ${index + 1}`;
+    if (!element || !['text', 'image'].includes(element.kind)) return `Invalid editable field ${field} on ${slug}: kind must be text or image.`;
+    const registered = element.field_id ? cmsFields.find(slug, element.field_id) : null;
+    if (!Number.isInteger(element.index) || (element.index < 0 && !registered)) return `Invalid editable field ${field} on ${slug}: element index is invalid.`;
+    if (!EDITABLE_SELECTORS.has(element.selector)) return `Invalid editable field ${field} on ${slug}: selector is not an approved public selector.`;
+    if (element.field_id && !registered && !element.field_id.startsWith(`${slug}.legacy.`)) return `Invalid editable field ${field} on ${slug}: field is not registered for this page.`;
+    if (registered && registered.kind !== element.kind) return `Invalid editable field ${field} on ${slug}: expected a ${registered.kind} field.`;
+    if (typeof element.value !== 'string') return `Invalid editable field ${field} on ${slug}: value must be text.`;
+    if (element.kind === 'image' && element.value && !SAFE_IMAGE.test(element.value)) return `Invalid editable field ${field} on ${slug}: image reference is not allowed.`;
+    if (element.href && (typeof element.href !== 'string' || !SAFE_HREF.test(element.href))) return `Invalid editable field ${field} on ${slug}: link must be an approved internal or external URL.`;
+    if (element.alt !== undefined && typeof element.alt !== 'string') return `Invalid editable field ${field} on ${slug}: alt text must be text.`;
+    if (element.position && !['center', 'top', 'bottom', 'left', 'right'].includes(element.position)) return `Invalid editable field ${field} on ${slug}: image position is invalid.`;
+  }
+  return null;
+}
+
+app.use(sameOrigin);
+app.get('/api/auth/me', (req, res) => req.session.user ? res.json({ user: req.session.user }) : res.status(401).json({ error: 'Not authenticated.' }));
+app.post('/api/auth/login', loginLimiter, async (req, res, next) => {
+  try {
+    const email = cleanEmail(req.body.email);
+    const password = String(req.body.password || '');
+    const user = (await query(pool, 'SELECT id, email, password_hash, role, active FROM admin_users WHERE email = $1', [email])).rows[0];
+    if (!user || !user.active || !(await bcrypt.compare(password, user.password_hash))) return res.status(401).json({ error: 'Invalid email or password.' });
+    req.session.regenerate((error) => {
+      if (error) return res.status(500).json({ error: 'Could not start a secure session.' });
+      req.session.user = { id: user.id, email: user.email, role: user.role };
+      res.json({ user: req.session.user });
+    });
+  } catch (error) { next(error); }
+});
+app.post('/api/auth/logout', requireAuth, (req, res) => req.session.destroy((error) => error ? res.status(500).json({ error: 'Could not end session.' }) : res.status(204).end()));
+
+app.get('/api/pages', requireAuth, async (_req, res, next) => { try { res.json({ pages: (await query(pool, 'SELECT slug, name, sort_order FROM pages ORDER BY sort_order')).rows }); } catch (error) { next(error); } });
+app.get('/api/pages/:slug', requireAuth, async (req, res, next) => {
+  try {
+    const page = (await query(pool, 'SELECT slug, name, sort_order FROM pages WHERE slug = $1', [req.params.slug])).rows[0];
+    if (!page) return res.status(404).json({ error: 'Page not found.' });
+    const pageKey = await pageId(pool, req.params.slug);
+    const revisions = (await query(pool, 'SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = $1 ORDER BY created_at DESC LIMIT 50', [pageKey])).rows;
+    res.json({ page, draft: await allContent(pool, req.params.slug, 'draft'), published: await allContent(pool, req.params.slug, 'published'), revisions });
+  } catch (error) { next(error); }
+});
+app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  try {
+    if (!req.body || typeof req.body.content !== 'object') return res.status(400).json({ error: 'A content object is required.' });
+    const validationError = validateContent(req.params.slug, req.body.content);
+    if (validationError) return res.status(400).json({ error: validationError });
+    const language = req.body.language === 'sw' ? 'sw' : 'en';
+    const result = await saveContent(pool, req.params.slug, 'draft', req.body.content, req.user.id, language);
+    audit(req, 'draft.save', req.params.slug, { language, version: result.version });
+    res.json({ ok: true, ...result, draft: await allContent(pool, req.params.slug, 'draft') });
+  } catch (error) { next(error); }
+});
+app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const page = (await query(client, 'SELECT id FROM pages WHERE slug = $1', [req.params.slug])).rows[0];
+    if (!page) return res.status(404).json({ error: 'Page not found.' });
+    const drafts = await allContent(client, req.params.slug, 'draft');
+    const languages = Object.keys(drafts);
+    if (!languages.length) return res.status(400).json({ error: 'Save a draft before publishing.' });
+    const materialized = {};
+    for (const language of languages) {
+      materialized[language] = await materializeMedia(drafts[language].content);
+      const unresolved = collectMediaMarkers(materialized[language]);
+      if (unresolved.length) throw new Error(`Publishing stopped: unresolved media reference(s): ${unresolved.join(', ')}`);
+    }
+    await client.query('BEGIN');
+    for (const language of languages) {
+      const current = await currentContent(client, req.params.slug, 'published', language);
+      if (current) await query(client, 'INSERT INTO content_revisions (page_id, language, version, content_json, created_by) VALUES ($1, $2, $3, $4::jsonb, $5)', [page.id, language, current.version, safeJson(current.content), req.user.id]);
+      await saveContent(client, req.params.slug, 'published', materialized[language], req.user.id, language);
+    }
+    await client.query('COMMIT');
+    audit(req, 'publish', req.params.slug, { languages });
+    const revisions = (await query(client, 'SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = $1 ORDER BY created_at DESC LIMIT 50', [page.id])).rows;
+    res.json({ ok: true, published: await allContent(client, req.params.slug, 'published'), revisions });
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
+    next(error);
+  } finally { client.release(); }
+});
+app.post('/api/pages/:slug/restore/:revisionId', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => {
+  try {
+    const pageKey = await pageId(pool, req.params.slug);
+    const revision = (await query(pool, 'SELECT page_id, language, content_json FROM content_revisions WHERE id = $1', [Number(req.params.revisionId)])).rows[0];
+    if (!revision || revision.page_id !== pageKey) return res.status(404).json({ error: 'Revision not found.' });
+    await saveContent(pool, req.params.slug, 'draft', parseJson(revision.content_json), req.user.id, revision.language);
+    audit(req, 'revision.restore', req.params.slug, { revisionId: revision.id });
+    res.json({ ok: true, draft: await allContent(pool, req.params.slug, 'draft') });
+  } catch (error) { next(error); }
+});
+app.get('/api/public/:slug', async (req, res, next) => {
+  try {
+    const page = (await query(pool, 'SELECT slug, name FROM pages WHERE slug = $1', [req.params.slug])).rows[0];
+    if (!page) return res.status(404).json({ error: 'Page not found.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ page, published: await allContent(pool, req.params.slug, 'published') });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/media', requireAuth, async (_req, res, next) => { try { const assets = (await query(pool, 'SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC')).rows.map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` })); res.json({ media: assets }); } catch (error) { next(error); } });
+app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: 'BLOB_PRIVATE_READ_WRITE_TOKEN is required before uploading an image.' });
+    const dimensions = imageSize(req.file.buffer);
+    const id = crypto.randomUUID();
+    const { put } = require('@vercel/blob');
+    const blob = await put(`private/${id}${path.extname(req.file.originalname).toLowerCase()}`, req.file.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: req.file.mimetype });
+    assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
+    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, req.file.originalname, blob.pathname || blob.url, req.file.mimetype, req.file.size, dimensions.width || null, dimensions.height || null, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
+    audit(req, 'media.upload', id, { filename: req.file.originalname });
+    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: req.file.mimetype, file_size: req.file.size, width: dimensions.width || null, height: dimensions.height || null, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+  } catch (error) { next(error); }
+});
+app.get('/api/media/:id/file', requireAuth, async (req, res, next) => {
+  try {
+    const asset = (await query(pool, 'SELECT storage_path, mime_type, public_url FROM media_assets WHERE id = $1', [req.params.id])).rows[0];
+    if (!asset) return res.status(404).end();
+    if (asset.public_url) return res.redirect(asset.public_url);
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).end();
+    const { get } = require('@vercel/blob');
+    const blob = await get(blobPathname(asset.storage_path), { access: 'private', token: PRIVATE_BLOB_TOKEN, useCache: false });
+    if (!blob || blob.statusCode !== 200) return res.status(404).end();
+    res.type(asset.mime_type).set('Cache-Control', 'private, no-cache');
+    return Readable.fromWeb(blob.stream).pipe(res);
+  } catch (error) { next(error); }
+});
+
+app.post('/api/messages', async (req, res, next) => {
+  try {
+    const type = req.body.type === 'partnership' ? 'partnership' : 'contact';
+    const name = String(req.body.name || '').trim(); const phone = String(req.body.phone || '').trim(); const message = String(req.body.message || '').trim(); const email = String(req.body.email || '').trim();
+    if (!name || !phone || !message) return res.status(400).json({ error: 'Name, phone and message are required.' });
+    if (name.length > 120 || phone.length > 60 || message.length > 5000 || email.length > 180) return res.status(400).json({ error: 'Message fields are too long.' });
+    const result = await query(pool, 'INSERT INTO messages (type, name, phone, email, message) VALUES ($1, $2, $3, $4, $5) RETURNING id', [type, name, phone, email || null, message]);
+    res.status(201).json({ ok: true, id: result.rows[0].id });
+  } catch (error) { next(error); }
+});
+app.get('/api/messages', requireAuth, requireRole('owner', 'admin', 'editor'), async (_req, res, next) => { try { res.json({ messages: (await query(pool, 'SELECT * FROM messages ORDER BY created_at DESC')).rows }); } catch (error) { next(error); } });
+app.patch('/api/messages/:id', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => { try { const status = req.body.status === 'handled' ? 'handled' : 'new'; await query(pool, 'UPDATE messages SET status = $1, handled_at = $2, handled_by = $3 WHERE id = $4', [status, status === 'handled' ? nowIso() : null, status === 'handled' ? req.user.id : null, Number(req.params.id)]); res.json({ ok: true }); } catch (error) { next(error); } });
+app.get('/api/settings', requireAuth, requireRole('owner', 'admin'), async (_req, res, next) => { try { const rows = (await query(pool, 'SELECT key, value_json FROM site_settings')).rows; res.json({ settings: Object.fromEntries(rows.map((row) => [row.key, parseJson(row.value_json)])) }); } catch (error) { next(error); } });
+app.put('/api/settings', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => { try { for (const [key, value] of Object.entries(req.body.settings || {})) await query(pool, 'INSERT INTO site_settings (key, value_json, updated_by, updated_at) VALUES ($1, $2::jsonb, $3, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP', [key, safeJson(value), req.user.id]); audit(req, 'settings.update', 'site_settings'); res.json({ ok: true }); } catch (error) { next(error); } });
+
+function frontendAssetHeaders(res, filePath) {
+  if (/\.(html|js|css)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+}
+
+app.get('/admin/', (_req, res) => res.set('Cache-Control', 'no-cache, must-revalidate').sendFile(path.join(ROOT, 'admin', 'index.html')));
+app.use('/admin', express.static(path.join(ROOT, 'admin'), { setHeaders: frontendAssetHeaders }));
+app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
+app.use(express.static(ROOT, { extensions: ['html'], index: false, setHeaders: frontendAssetHeaders }));
+app.use((error, _req, res, _next) => { console.error(error); res.status(error.statusCode || 500).json({ error: error.message || 'Request failed.' }); });
+
+if (require.main === module) {
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, () => console.log(`EcoPower PostgreSQL CMS running at ${PUBLIC_ORIGIN}`));
+}
+
+module.exports = { app, pool, ready };

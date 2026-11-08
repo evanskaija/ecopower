@@ -5,7 +5,7 @@ const translations = {
     'nav.home': 'Home', 'nav.products': 'Products & prices', 'nav.about': 'About us', 'nav.team': 'Our team', 'nav.impact': 'Our impact', 'nav.partner': 'Partner with us', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.order': 'Order on WhatsApp',
     'lang.choose': 'Choose language', 'lang.english': 'English', 'lang.swahili': 'Swahili',
     'common.learn': 'Learn more', 'common.order': 'Order on WhatsApp', 'common.quote': 'Request a quote', 'common.contact': 'Contact the team', 'common.send': 'Send message', 'common.call': 'Call us',
-    'home.eyebrow': 'Clean cooking. Made in Tanzania.', 'home.title': 'Makange - Kwa maisha <em>bora.</em>', 'home.lede': 'Clean cooking fuel made from recovered charcoal dust, agricultural and forest waste at our factory in Kunduchi. Reliable energy for homes, food businesses and institutions.', 'home.explore': 'Explore our products', 'home.caption': 'Pay cash on delivery or through Lipa Namba.', 'home.price': 'Makange pricing', 'home.priceNote': 'Order from 20 kg for delivery within 10 km. Smaller orders can be found at a WAKALA shop.', 'home.trustFactory': 'Made in our own factory', 'home.trustFactoryNote': 'Silver Sands, Kunduchi', 'home.trustDelivery': 'Next-day delivery', 'home.trustDeliveryNote': 'Within our delivery area', 'home.trustPayment': 'Pay any way', 'home.trustPaymentNote': 'Cash, mobile money or bank', 'home.trustBurn': 'Long, steady burn', 'home.trustBurnNote': 'Less smoke while cooking', 'home.productsEyebrow': 'Products & prices', 'home.productsTitle': 'Fuel that fits <em>your life.</em>', 'home.productsText': 'Makange is made for the way Tanzanian homes, food sellers, schools and institutions cook every day.', 'home.monthlyTitle': 'Regular monthly orders', 'home.monthlyText': 'A fixed number of bags delivered through the month, paid on delivery. Ideal for schools, restaurants and institutions.', 'home.howEyebrow': 'Simple ordering', 'home.howTitle': 'Order in <em>three steps.</em>', 'home.howText': 'Tell us what you need, choose your payment method, and our delivery crew will bring it to you.', 'home.step1': 'Contact or WhatsApp', 'home.step1Text': 'Tell us the sack size, how many you need, and where.', 'home.step2': 'Pay your way', 'home.step2Text': 'Use Lipa Namba now, or pay cash when it arrives.', 'home.step3': 'Delivered next day', 'home.step3Text': 'Our Toyo crew delivers within 10 km. For smaller orders, visit a WAKALA shop.', 'home.paymentTitle': 'Pay by Lipa Namba from any network or bank', 'home.paymentText': 'Send the payment message to WhatsApp after paying so we can confirm your order.', 'home.factoryEyebrow': 'From our factory', 'home.factoryTitle': 'A working plant in Kunduchi, with its own delivery fleet', 'home.factoryText': 'EcoPower Solutions Limited makes Makange briquettes from recovered charcoal dust, agricultural and forest waste. Our factory and delivery partners help bring reliable cooking fuel closer to households and businesses.', 'home.usersEyebrow': 'Who cooks with Makange', 'home.usersTitle': 'Built for real kitchens.', 'home.impactEyebrow': 'Our impact', 'home.impactTitle': 'Cleaner cooking with <em>measurable change.</em>', 'home.impactText': 'Our full-production estimates show the potential for waste recovery, local livelihoods and lower everyday cooking costs.', 'home.ctaTitle': 'Ready to cook <em>smarter?</em>', 'home.ctaText': 'Order Makange or contact the team for a business supply quotation.',
+    'home.eyebrow': 'CLEAN COOKING FUEL BY ECOPOWER · DAR ES SALAAM', 'home.title': 'Makange — Kwa maisha <em>bora.</em>', 'home.lede': 'Clean cooking fuel, delivered to your door. Briquettes made from char, agro and forest waste at our factory in Kunduchi, brought to your door by our own Toyo tricycles.', 'home.howToPay': 'How to pay', 'home.captionContact': 'Call or WhatsApp', 'home.caption': 'Pay cash on delivery or by Lipa Namba', 'home.explore': 'Explore our products', 'home.price': 'Makange pricing', 'home.priceNote': 'Door delivery from 20 × 50kg sacks · Bulk and monthly orders: ask on WhatsApp', 'home.trustFactory': 'Made in our own factory', 'home.trustFactoryNote': 'Silver Sands, Kunduchi, since 2023', 'home.trustDelivery': 'Next-day delivery', 'home.trustDeliveryNote': 'Within 10 km · order a day before · from 20 bags', 'home.trustPayment': 'Pay any way', 'home.trustPaymentNote': 'Cash, M-Pesa, any network, bank or card', 'home.trustBurn': 'Long, steady burn', 'home.trustBurnNote': 'Up to 6 hours, tested by TIRDO', 'home.productsEyebrow': 'Products & prices', 'home.productsTitle': 'Makange briquettes', 'home.productsText': 'Made from char dust, agro and forest waste mixed with a binder, pressed by machine and sun-dried.', 'home.monthlyTitle': 'Regular monthly orders', 'home.monthlyText': 'A fixed number of bags delivered through the month, paid on delivery. Already working for chips sellers in Kinondoni.', 'home.businessQuote': 'Get a business quote', 'home.howEyebrow': 'Simple ordering', 'home.howTitle': 'Order in <em>three steps.</em>', 'home.howText': 'Tell us what you need, choose your payment method, and our delivery crew will bring it to you.', 'home.step1': 'Call or WhatsApp', 'home.step1Text': 'Tell us the sack size, how many you need, and where.', 'home.step2': 'Pay your way', 'home.step2Text': 'Use Lipa Namba now, or pay cash when it arrives.', 'home.step3': 'Delivered next day', 'home.step3Text': 'Our Toyo crew delivers within 10 km. For smaller orders, visit a WAKALA shop.', 'home.paymentTitle': 'Pay by Lipa Namba from any network or bank', 'home.paymentText': 'Send the payment message to WhatsApp after paying so we can confirm your order.', 'home.factoryEyebrow': 'From our factory', 'home.factoryTitle': 'A working plant in Kunduchi, with its own delivery fleet', 'home.factoryText': 'EcoPower Solutions Limited started in 2023. We make Makange briquettes at our factory on Old Bagamoyo Road, Silver Sands, Kunduchi, using tailor-made machines that meet industry standards and give a premium output. Our cargo tricycles deliver to homes, food sellers and institutions across Dar es Salaam, together with our WAKALA partners and sales agents.', 'home.aboutMore': 'More about EcoPower', 'home.usersEyebrow': 'Who cooks with Makange', 'home.usersTitle': 'Built for real kitchens.', 'home.impactEyebrow': 'Our impact', 'home.impactTitle': 'Cleaner cooking with <em>measurable change.</em>', 'home.impactText': 'Our full-production estimates show the potential for waste recovery, local livelihoods and lower everyday cooking costs.', 'home.ctaTitle': 'Ready to cook <em>smarter?</em>', 'home.ctaText': 'Order Makange or contact the team for a business supply quotation.',
     'products.heroTitle': 'Better cooking starts with the <em>right fuel.</em>', 'products.heroText': 'Choose the Makange sack size and cookstove that fits your home, business or institution.', 'products.fuelTitle': 'Makange briquettes', 'products.fuelText': 'Made from charcoal dust, agricultural and forest waste mixed with a binder, machine-pressed and sun-dried.', 'products.lightTitle': 'How to light Makange', 'products.lightText': 'Four simple steps to get a steady cooking fire.', 'products.stovesTitle': 'Cookstoves', 'products.stovesText': 'Choose the stove for the way you cook.', 'products.bundleTitle': 'Starter bundle: household stove + 25 kg Makange', 'products.bundleText': 'A practical way to begin cleaner cooking at home.',
     'about.heroTitle': 'From local innovation to <em>cleaner kitchens.</em>', 'about.heroText': 'EcoPower Solutions Limited is a Tanzanian clean-energy manufacturer operating from Kunduchi since 2023.', 'about.whoTitle': 'Who we are', 'about.storyTitle': 'Our story so far', 'about.madeTitle': 'How Makange is made', 'about.mission': 'Our mission', 'about.vision': 'Our vision',
     'team.heroTitle': 'The people powering <em>EcoPower.</em>', 'team.heroText': 'A small Tanzanian team making clean cooking fuel in Kunduchi and bringing it to kitchens across Dar es Salaam.', 'team.management': 'Management', 'team.board': 'Board of directors', 'team.crew': 'The crew who make it happen',
@@ -18,7 +18,7 @@ const translations = {
     'nav.home': 'Nyumbani', 'nav.products': 'Bidhaa na bei', 'nav.about': 'Kuhusu sisi', 'nav.team': 'Timu yetu', 'nav.impact': 'Matokeo yetu', 'nav.partner': 'Shirikiana nasi', 'nav.faq': 'Maswali', 'nav.contact': 'Wasiliana nasi', 'nav.order': 'Agiza WhatsApp',
     'lang.choose': 'Chagua lugha', 'lang.english': 'Kiingereza', 'lang.swahili': 'Kiswahili',
     'common.learn': 'Jifunze zaidi', 'common.order': 'Agiza WhatsApp', 'common.quote': 'Omba bei ya biashara', 'common.contact': 'Wasiliana na timu', 'common.send': 'Tuma ujumbe', 'common.call': 'Piga simu',
-    'home.eyebrow': 'Upishi safi. Umetengenezwa Tanzania.', 'home.title': 'Makange - Kwa maisha <em>bora.</em>', 'home.lede': 'Nishati safi ya kupikia inayotengenezwa kutokana na mabaki ya mkaa, taka za kilimo na misitu katika kiwanda chetu Kunduchi. Nishati ya kuaminika kwa nyumba, biashara za chakula na taasisi.', 'home.explore': 'Tazama bidhaa zetu', 'home.caption': 'Lipa kwa fedha taslimu unapopokea au Lipa Namba.', 'home.price': 'Bei za Makange', 'home.priceNote': 'Agiza kuanzia kilo 20 kwa delivery ndani ya km 10. Agizo dogo linapatikana kwa WAKALA.', 'home.trustFactory': 'Imetengenezwa kiwandani kwetu', 'home.trustFactoryNote': 'Silver Sands, Kunduchi', 'home.trustDelivery': 'Delivery siku inayofuata', 'home.trustDeliveryNote': 'Ndani ya eneo letu', 'home.trustPayment': 'Lipa kwa njia yoyote', 'home.trustPaymentNote': 'Cash, simu au benki', 'home.trustBurn': 'Moto mrefu na thabiti', 'home.trustBurnNote': 'Moshi mdogo wakati wa kupika', 'home.productsEyebrow': 'Bidhaa na bei', 'home.productsTitle': 'Mafuta yanayolingana na <em>maisha yako.</em>', 'home.productsText': 'Makange imetengenezwa kwa namna ambavyo nyumba, mama ntilie, shule na taasisi Tanzania hupika kila siku.', 'home.monthlyTitle': 'Maagizo ya kila mwezi', 'home.monthlyText': 'Idadi maalum ya magunia inapelekwa kila mwezi na inalipwa wakati wa delivery. Inafaa kwa shule, migahawa na taasisi.', 'home.howEyebrow': 'Kuagiza kwa urahisi', 'home.howTitle': 'Agiza kwa <em>hatua tatu.</em>', 'home.howText': 'Tuambie unachohitaji, chagua njia ya malipo, na timu yetu italeta bidhaa kwako.', 'home.step1': 'Wasiliana WhatsApp', 'home.step1Text': 'Tuambie ukubwa wa gunia, idadi na eneo lako.', 'home.step2': 'Lipa kwa njia yako', 'home.step2Text': 'Tumia Lipa Namba sasa au lipa cash wakati bidhaa inafika.', 'home.step3': 'Delivery siku inayofuata', 'home.step3Text': 'Toyo yetu inaleta bidhaa ndani ya km 10. Kwa agizo dogo, tembelea WAKALA.', 'home.paymentTitle': 'Lipa Namba kutoka mtandao au benki yoyote', 'home.paymentText': 'Tuma ujumbe wa malipo WhatsApp baada ya kulipa ili tuthibitishe oda yako.', 'home.factoryEyebrow': 'Kutoka kiwandani kwetu', 'home.factoryTitle': 'Kiwanda kinachofanya kazi Kunduchi, chenye delivery yake', 'home.factoryText': 'EcoPower Solutions Limited inatengeneza briquettes za Makange kutokana na mabaki ya mkaa, taka za kilimo na misitu. Kiwanda na washirika wetu wa delivery huleta nishati ya kuaminika karibu na nyumba na biashara.', 'home.usersEyebrow': 'Nani anapika kwa Makange', 'home.usersTitle': 'Imetengenezwa kwa jikoni halisi.', 'home.impactEyebrow': 'Matokeo yetu', 'home.impactTitle': 'Upishi safi wenye <em>mabadiliko yanayopimika.</em>', 'home.impactText': 'Makadirio ya uzalishaji kamili yanaonyesha uwezo wa kubadilisha taka, kutengeneza ajira na kupunguza gharama za kupika kila siku.', 'home.ctaTitle': 'Uko tayari kupika <em>kwa werevu?</em>', 'home.ctaText': 'Agiza Makange au wasiliana na timu kwa bei ya supply ya biashara.',
+    'home.eyebrow': 'MAFUTA SAFI YA KUPIKIA YA ECOPOWER · DAR ES SALAAM', 'home.title': 'Makange — Kwa maisha <em>bora.</em>', 'home.lede': 'Nishati safi ya kupikia, ikiletwa mlangoni kwako. Briquettes zinazotengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu katika kiwanda chetu Kunduchi, kisha kuletwa kwako na Toyo zetu.', 'home.howToPay': 'Jinsi ya kulipa', 'home.captionContact': 'Piga simu au WhatsApp', 'home.caption': 'Lipa taslimu unapopokea au kwa Lipa Namba', 'home.explore': 'Tazama bidhaa zetu', 'home.price': 'Bei za Makange', 'home.priceNote': 'Delivery mlangoni kutoka magunia 20 ya 50kg · Maagizo ya jumla na kila mwezi: uliza WhatsApp', 'home.trustFactory': 'Inatengenezwa kiwandani kwetu', 'home.trustFactoryNote': 'Silver Sands, Kunduchi, tangu 2023', 'home.trustDelivery': 'Tunaleta kesho yake', 'home.trustDeliveryNote': 'Ndani ya km 10 · agiza siku moja kabla · kuanzia magunia 20', 'home.trustPayment': 'Lipa unavyotaka', 'home.trustPaymentNote': 'Taslimu, M-Pesa, mtandao wowote, benki au kadi', 'home.trustBurn': 'Inawaka muda mrefu, kwa utulivu', 'home.trustBurnNote': 'Hadi saa 6, imepimwa na TIRDO', 'home.productsEyebrow': 'Bidhaa na bei', 'home.productsTitle': 'Briquettes za Makange', 'home.productsText': 'Zimetengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu zilizochanganywa na binder, zikabonyezwa kwa mashine na kukaushwa juani.', 'home.monthlyTitle': 'Maagizo ya kila mwezi', 'home.monthlyText': 'Idadi maalum ya magunia inapelekwa kwa mwezi na inalipwa wakati wa delivery. Tayari inawasaidia wauza chips Kinondoni.', 'home.businessQuote': 'Pata bei ya biashara', 'home.howEyebrow': 'Kuagiza kwa urahisi', 'home.howTitle': 'Agiza kwa <em>hatua tatu.</em>', 'home.howText': 'Tuambie unachohitaji, chagua njia ya malipo, na timu yetu italeta bidhaa kwako.', 'home.step1': 'Piga simu au WhatsApp', 'home.step1Text': 'Tuambie ukubwa wa gunia, idadi na eneo lako.', 'home.step2': 'Lipa kwa njia yako', 'home.step2Text': 'Tumia Lipa Namba sasa au lipa cash wakati bidhaa inafika.', 'home.step3': 'Delivery siku inayofuata', 'home.step3Text': 'Toyo yetu inaleta bidhaa ndani ya km 10. Kwa agizo dogo, tembelea WAKALA.', 'home.paymentTitle': 'Lipa Namba kutoka mtandao au benki yoyote', 'home.paymentText': 'Tuma ujumbe wa malipo WhatsApp baada ya kulipa ili tuthibitishe oda yako.', 'home.factoryEyebrow': 'Kutoka kiwandani kwetu', 'home.factoryTitle': 'Kiwanda kinachofanya kazi Kunduchi, chenye delivery yake', 'home.factoryText': 'EcoPower Solutions Limited ilianza mwaka 2023. Tunatengeneza briquettes za Makange katika kiwanda chetu Old Bagamoyo Road, Silver Sands, Kunduchi, kwa kutumia mashine maalum zinazokidhi viwango vya sekta na kutoa bidhaa bora. Tricycles zetu husafirisha kwa nyumba, wauza chakula na taasisi Dar es Salaam, pamoja na washirika wetu WAKALA na mawakala wa mauzo.', 'home.aboutMore': 'Zaidi kuhusu EcoPower', 'home.usersEyebrow': 'Nani anapika kwa Makange', 'home.usersTitle': 'Imetengenezwa kwa jikoni halisi.', 'home.impactEyebrow': 'Matokeo yetu', 'home.impactTitle': 'Upishi safi wenye <em>mabadiliko yanayopimika.</em>', 'home.impactText': 'Makadirio ya uzalishaji kamili yanaonyesha uwezo wa kubadilisha taka, kutengeneza ajira na kupunguza gharama za kupika kila siku.', 'home.ctaTitle': 'Uko tayari kupika <em>kwa werevu?</em>', 'home.ctaText': 'Agiza Makange au wasiliana na timu kwa bei ya supply ya biashara.',
     'products.heroTitle': 'Upishi bora huanza na <em>mafuta sahihi.</em>', 'products.heroText': 'Chagua ukubwa wa gunia la Makange na jiko linalofaa nyumba, biashara au taasisi yako.', 'products.fuelTitle': 'Briquettes za Makange', 'products.fuelText': 'Imetengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu, binder, machine pressing na kukaushwa juani.', 'products.lightTitle': 'Jinsi ya kuwasha Makange', 'products.lightText': 'Hatua nne rahisi kupata moto wa kupikia ulio thabiti.', 'products.stovesTitle': 'Majiko', 'products.stovesText': 'Chagua jiko kulingana na namna unavyopika.', 'products.bundleTitle': 'Kifurushi cha kuanzia: jiko la nyumbani + Makange kilo 25', 'products.bundleText': 'Njia rahisi kuanza upishi safi nyumbani.',
     'about.heroTitle': 'Kutoka ubunifu wa hapa hadi <em>jikoni safi.</em>', 'about.heroText': 'EcoPower Solutions Limited ni mtengenezaji wa nishati safi Tanzania anayefanya kazi Kunduchi tangu 2023.', 'about.whoTitle': 'Sisi ni nani', 'about.storyTitle': 'Hadithi yetu', 'about.madeTitle': 'Jinsi Makange inavyotengenezwa', 'about.mission': 'Dhamira yetu', 'about.vision': 'Maono yetu',
     'team.heroTitle': 'Watu wanaoiwezesha <em>EcoPower.</em>', 'team.heroText': 'Timu ndogo ya Tanzania inayotengeneza nishati safi Kunduchi na kuipeleka jikoni Dar es Salaam.', 'team.management': 'Uongozi', 'team.board': 'Bodi ya wakurugenzi', 'team.crew': 'Timu inayofanya kazi itimie',
@@ -419,10 +419,260 @@ const applyTranslations = (language) => {
   applyStaticTranslations(language);
 };
 
+const cmsEscape = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+let cmsPublishedVersion = '';
+const cmsAssetUrl = (value = '') => {
+  if (value.startsWith('media:')) return `/api/media/${value.slice(6)}/file`;
+  if (!cmsPublishedVersion || value.startsWith('data:') || value.startsWith('/api/')) return value;
+  try {
+    const url = new URL(value, window.location.href);
+    const isPublishedAsset = url.pathname.startsWith('/uploads/published/') || url.hostname.endsWith('.blob.vercel-storage.com');
+    if (!isPublishedAsset) return value;
+    url.searchParams.set('cms_version', cmsPublishedVersion);
+    return value.startsWith('/') ? `${url.pathname}${url.search}` : url.toString();
+  } catch {
+    return value;
+  }
+};
+const cmsText = (selector, value, html = false, scope = document) => {
+  const element = scope.querySelector(selector);
+  if (!element || value === undefined || value === null) return;
+  if (html) element.innerHTML = value;
+  else element.textContent = value;
+};
+const cmsHeadline = (copy) => `${cmsEscape(copy.title || '')} <em>${cmsEscape(copy.emphasis || '')}</em>`;
+const cmsHeadlineWithEmphasis = (value = '', language = 'en') => {
+  const safe = cmsEscape(value);
+  return language === 'sw' ? safe.replace('hatua tatu.', '<em>hatua tatu.</em>') : safe.replace('three steps.', '<em>three steps.</em>');
+};
+const cmsImage = (selector, value, alt, position, scope = document) => {
+  const image = scope.querySelector(selector);
+  if (!image || !value) return;
+  image.src = cmsAssetUrl(value);
+  if (alt !== undefined) image.alt = alt;
+  if (position) image.style.objectPosition = position;
+};
+const cmsImageList = (selector, records = []) => records.forEach((record, index) => {
+  const image = document.querySelectorAll(selector)[index];
+  if (!image || !record?.image) return;
+  image.src = cmsAssetUrl(record.image);
+  const copy = record[document.documentElement.lang === 'sw' ? 'sw' : 'en'] || record.en || {};
+  if (copy.alt !== undefined) image.alt = copy.alt;
+  if (record.position) image.style.objectPosition = record.position;
+});
+const cmsQuery = new URLSearchParams(window.location.search);
+const cmsPreviewMode = cmsQuery.get('cmsPreview') === '1';
+const cmsPreviewVariant = cmsQuery.get('previewMode') === 'published' ? 'published' : 'draft';
+let cmsPreviewOverride = null;
+const loadCmsContentFromApi = async (language, preview = cmsPreviewMode, variant = cmsPreviewVariant) => {
+  const page = document.body.dataset.page || 'home';
+  try {
+    const useDraftEndpoint = preview && variant === 'draft';
+    const response = await fetch(useDraftEndpoint ? `/api/pages/${page}` : `/api/public/${page}`, { credentials: 'same-origin', cache: 'no-store' });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const collection = useDraftEndpoint ? payload.draft : payload.published;
+    const requested = collection?.[language];
+    const fallback = page === 'home' ? (collection?.en || collection?.sw) : null;
+    const record = requested || fallback;
+    cmsPublishedVersion = record?.updated_at || (record?.version ? String(record.version) : '');
+    return record?.content || null;
+  } catch { return null; }
+};
+const syncCmsHomeContent = async (language, preview = cmsPreviewMode) => {
+  if (cmsPreviewOverride?.content) {
+    if (document.body.dataset.page === 'home') applyCmsHomeContent(cmsPreviewOverride.content, cmsPreviewOverride.language || language);
+    else applyCmsPageContent(cmsPreviewOverride.content);
+    return;
+  }
+  const content = await loadCmsContentFromApi(language, preview);
+  // A parent preview message may arrive while the API request is in flight.
+  // Never let that older response overwrite the current dashboard selection.
+  if (cmsPreviewOverride?.content) {
+    if (document.body.dataset.page === 'home') applyCmsHomeContent(cmsPreviewOverride.content, cmsPreviewOverride.language || language);
+    else applyCmsPageContent(cmsPreviewOverride.content);
+    return;
+  }
+  if (!content) return;
+  if (document.body.dataset.page === 'home') applyCmsHomeContent(content, language);
+  else applyCmsPageContent(content);
+};
+const applyCmsHomeContent = (content, language = document.documentElement.lang || 'en') => {
+  if (!content || document.body.dataset.page !== 'home') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  const hero = content.hero;
+  const heroCopy = hero?.[lang] || hero?.en;
+  if (heroCopy) {
+    cmsText('.hero .eyebrow', heroCopy.eyebrow);
+    cmsText('.hero h1', cmsHeadline(heroCopy), true);
+    cmsText('.hero .hero-copy > p:not(.eyebrow)', heroCopy.description);
+    const heroButtons = document.querySelectorAll('.hero-actions a');
+    if (heroButtons[0]) { heroButtons[0].textContent = heroCopy.primaryLabel; heroButtons[0].href = hero?.primaryLink || heroButtons[0].href; }
+    if (heroButtons[1]) { heroButtons[1].textContent = heroCopy.secondaryLabel; heroButtons[1].href = hero?.secondaryLink || heroButtons[1].href; }
+    cmsText('.hero-caption > span', `${cmsEscape(heroCopy.captionContact)} <strong>${cmsEscape('0784 017 225')}</strong> <span aria-hidden="true">·</span> ${cmsEscape(heroCopy.caption)}`, true);
+    cmsImage('.hero-photo', hero.image, heroCopy.alt, hero.imagePosition);
+  }
+  const homeImages = content.images;
+  if (homeImages) {
+    cmsImage('.hero-brand-mark', homeImages.brand?.image, homeImages.brand?.[lang]?.alt, homeImages.brand?.position);
+    cmsImageList('#how-it-works .payment-qr-card img', homeImages.paymentQr);
+    cmsImageList('.factory-collage img', homeImages.factoryGallery);
+    cmsImageList('.category-grid .category-card img', homeImages.kitchenGallery);
+    cmsImageList('.home-partner-logos img', homeImages.partnerLogos);
+  }
+  const priceNote = content.hero?.[lang]?.priceNote || content.hero?.priceNote;
+  if (priceNote) cmsText('.price-panel-note', priceNote);
+  content.trust?.items?.forEach((item, index) => {
+    const element = document.querySelectorAll('.trust-item')[index];
+    const copy = item[lang] || item.en;
+    if (!element || !copy) return;
+    cmsText(`.trust-item:nth-child(${index + 1}) strong`, copy.title);
+    cmsText(`.trust-item:nth-child(${index + 1}) span`, copy.description);
+  });
+  const products = content.products;
+  const productsCopy = products?.[lang] || products?.en;
+  if (productsCopy) {
+    cmsText('#products .section-heading .eyebrow', productsCopy.eyebrow);
+    cmsText('#products .section-heading h2', productsCopy.heading);
+    cmsText('#products .section-heading > p', productsCopy.description);
+    products?.items?.forEach((product, index) => {
+      const card = document.querySelectorAll('#products .product-card')[index];
+      const copy = product[lang] || product.en;
+      if (!card || !copy) return;
+      cmsText('h3', copy.name, false, card);
+      cmsText('p:not(.card-kicker)', copy.description, false, card);
+      cmsText('.price-row strong', product.price, false, card);
+      const weight = copy.name.match(/\d+\s?kg/i)?.[0] || '';
+      cmsText('.price-row span', weight, false, card);
+      const button = card.querySelector('.button');
+      if (button) { button.textContent = copy.button; button.href = product.link || button.href; }
+      cmsImage('img', product.image, copy.alt, product.imagePosition, card);
+    });
+    products?.items?.forEach((product, index) => {
+      const panelPrice = document.querySelectorAll('.price-panel-grid strong')[index];
+      const panelWeight = document.querySelectorAll('.price-panel-grid small')[index];
+      const copy = product[lang] || product.en || {};
+      if (panelPrice) panelPrice.textContent = product.price || '';
+      if (panelWeight) panelWeight.textContent = copy.name?.match(/\d+\s?kg/i)?.[0] || '';
+    });
+    const business = document.querySelector('#products .note-card');
+    if (business) {
+      cmsText('.eyebrow', productsCopy.businessLabel, false, business);
+      cmsText('h3', productsCopy.businessHeading, false, business);
+      cmsText('p', productsCopy.businessDescription, false, business);
+      business.querySelectorAll('li').forEach((item, index) => { if (productsCopy.list?.[index]) item.textContent = productsCopy.list[index]; });
+      const button = business.querySelector('.button');
+      if (button) button.textContent = productsCopy.businessButton;
+    }
+  }
+  const ordering = content.ordering;
+  const orderingCopy = ordering?.[lang] || ordering?.en;
+  if (orderingCopy) {
+    cmsText('#how-it-works .section-heading h2', cmsHeadlineWithEmphasis(orderingCopy.heading, lang), true);
+    orderingCopy.steps?.forEach((step, index) => { cmsText(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.title); cmsText(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.description); });
+    cmsText('#how-it-works .payment-copy .eyebrow', orderingCopy.paymentEyebrow);
+    cmsText('#how-it-works .payment-copy h3', orderingCopy.paymentTitle);
+    cmsText('#how-it-works .payment-copy > p', orderingCopy.paymentDescription);
+    const rows = document.querySelectorAll('#how-it-works .payment-row');
+    [[orderingCopy.mpesaLabel, orderingCopy.mpesaNumber, orderingCopy.mpesaNote], [orderingCopy.crdbLabel, orderingCopy.crdbNumber, orderingCopy.crdbNote]].forEach((row, index) => { if (!rows[index]) return; cmsText('span', row[0], false, rows[index]); cmsText('strong', row[1], false, rows[index]); cmsText('small', row[2], false, rows[index]); });
+  }
+  const factory = content.factory;
+  const factoryCopy = factory?.[lang] || factory?.en;
+  if (factoryCopy) {
+    cmsText('.story-copy .eyebrow', factoryCopy.eyebrow);
+    cmsText('.story-copy h2', factoryCopy.title);
+    cmsText('.story-copy > p', factoryCopy.description);
+    cmsText('.story-copy .text-link', `${factoryCopy.button} →`);
+    cmsImage('.factory-main-image', factory.image, factoryCopy.alt, factory.imagePosition);
+  }
+  const kitchen = content.kitchen;
+  const kitchenCopy = kitchen?.[lang] || kitchen?.en;
+  if (kitchenCopy) {
+    cmsText('.kitchen-section .section-heading .eyebrow', kitchenCopy.eyebrow);
+    cmsText('.kitchen-section .section-heading h2', kitchenCopy.title);
+    kitchenCopy.categories?.forEach((value, index) => cmsText(`.category-grid .category-card:nth-child(${index + 1}) span`, value));
+    cmsText('.kitchen-quote blockquote', kitchenCopy.quote);
+    cmsText('.kitchen-quote p', kitchenCopy.translation);
+    const attribution = kitchenCopy.attribution?.split(',') || [];
+    cmsText('.kitchen-quote cite', `<strong>${cmsEscape(attribution.shift()?.trim() || '')}</strong>${attribution.length ? `, ${cmsEscape(attribution.join(',').trim())}` : ''}`, true);
+    if (!homeImages) cmsImage('.category-grid .category-card img', kitchen.image, undefined, kitchen.imagePosition);
+  }
+  const stoves = content.cookstoves;
+  const stoveCopy = stoves?.[lang] || stoves?.en;
+  if (stoveCopy) {
+    cmsText('.stove-showcase .section-heading h2', stoveCopy.title);
+    cmsText('.stove-showcase .section-heading > p', stoveCopy.description);
+    stoves.items?.forEach((item, index) => {
+      const card = document.querySelectorAll('.home-stove-card')[index];
+      const copy = item[lang] || item.en;
+      if (!card || !copy) return;
+      cmsText('.card-kicker', copy.kicker, false, card); cmsText('h3', copy.name, false, card); cmsText('p:not(.card-kicker)', copy.description, false, card); cmsText('.home-stove-price', copy.price, false, card);
+      const button = card.querySelector('.button'); if (button) button.textContent = copy.button;
+      cmsImage('img', item.image, copy.alt, item.imagePosition, card);
+    });
+  }
+  const impact = content.impact;
+  const impactCopy = impact?.[lang] || impact?.en;
+  if (impactCopy) {
+    cmsText('.home-impact-summary h2', impactCopy.title);
+    impact.stats?.forEach((stat, index) => { cmsText(`.home-impact-stats > div:nth-child(${index + 1}) strong`, stat.value); cmsText(`.home-impact-stats > div:nth-child(${index + 1}) span`, stat[lang] || stat.en); });
+    cmsText('.home-impact-summary > .page-width > p', impactCopy.note);
+  }
+  const partners = content.partners;
+  const partnerCopy = partners?.[lang] || partners?.en;
+  if (partnerCopy) { cmsText('.home-wakala-card h2', partnerCopy.title); cmsText('.home-wakala-card p', partnerCopy.description); const button = document.querySelector('.home-wakala-card .button'); if (button) { button.textContent = partnerCopy.button; button.href = partners.link || button.href; } }
+  const footer = content.footer;
+  const footerCopy = footer?.[lang] || footer?.en;
+  if (footerCopy) {
+    cmsText('.footer-name', footerCopy.brand); cmsText('.footer-brand > p', footerCopy.description);
+    const footerCols = document.querySelectorAll('.footer-col');
+    if (footerCols[0]) { cmsText('h3', footerCopy.contactHeading, false, footerCols[0]); cmsText('a:nth-of-type(1)', footerCopy.phone, false, footerCols[0]); cmsText('a:nth-of-type(2)', footerCopy.email, false, footerCols[0]); cmsText('span', footerCopy.address, false, footerCols[0]); }
+    if (footerCols[1]) { cmsText('h3', footerCopy.paymentHeading, false, footerCols[1]); cmsText('span:nth-of-type(1)', footerCopy.mpesa, false, footerCols[1]); cmsText('span:nth-of-type(2)', footerCopy.crdb, false, footerCols[1]); cmsText('span:nth-of-type(3)', footerCopy.cash, false, footerCols[1]); }
+    if (footerCols[2]) { cmsText('h3', footerCopy.socialHeading, false, footerCols[2]); cmsText('span:nth-of-type(1)', footerCopy.socialOne, false, footerCols[2]); cmsText('span:nth-of-type(2)', footerCopy.socialTwo, false, footerCols[2]); }
+  }
+};
+const applyCmsPageContent = (content) => {
+  if (!content?.elements || document.body.dataset.page === 'home') return;
+  window.EcoPowerCmsFields?.install(document.body.dataset.page);
+  content.elements.forEach((element) => {
+    const escaped = element.field_id && window.CSS?.escape ? window.CSS.escape(element.field_id) : element.field_id?.replace(/(["\\])/g, '\\$1');
+    const target = (escaped && document.querySelector(`[data-cms-id="${escaped}"]`)) || document.querySelectorAll(element.selector)[element.index];
+    if (!target) return;
+    if (element.kind === 'image') {
+      if (element.value) target.src = cmsAssetUrl(element.value);
+      if (element.alt !== undefined) target.alt = element.alt;
+      if (element.position) target.style.objectPosition = element.position;
+    } else {
+      if (element.value !== undefined) target.textContent = element.value;
+      if (element.href !== undefined && target.tagName === 'A') target.href = element.href;
+    }
+  });
+};
+window.__ecopowerApplyPreview = (content, language = 'en', version = '') => {
+  cmsPreviewOverride = { content, language, version };
+  if (version) cmsPublishedVersion = String(version);
+  if (document.body.dataset.page === 'home') applyCmsHomeContent(content, language);
+  else applyCmsPageContent(content);
+};
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.type === 'ecopower-cms-preview-ready') {
+    if (window.parent !== window) window.parent.postMessage({ type: 'ecopower-cms-preview-ready' }, window.location.origin);
+    return;
+  }
+  if (event.data?.type !== 'ecopower-cms-preview') return;
+  // The admin dashboard is the trusted same-origin parent of this iframe.
+  // Keep the message path authoritative so a late API response cannot put the
+  // old static image back over a newly selected draft image.
+  window.__ecopowerApplyPreview(event.data.content, event.data.language, event.data.version || '');
+});
+
 const setLanguage = (language) => {
   const safeLanguage = language === 'sw' ? 'sw' : 'en';
   localStorage.setItem('ecopower-language', safeLanguage);
   applyTranslations(safeLanguage);
+  void syncCmsHomeContent(safeLanguage);
   const code = document.querySelector('.language-code');
   const currentFlag = document.querySelector('.flag-current');
   const secondaryFlag = document.querySelector('.flag-secondary');
@@ -475,17 +725,31 @@ faqSearch?.addEventListener('input', () => {
   document.querySelectorAll('.faq-item').forEach((item) => { item.hidden = query && !item.textContent.toLowerCase().includes(query); });
 });
 
-document.querySelectorAll('[data-form]').forEach((form) => form.addEventListener('submit', (event) => {
+document.querySelectorAll('[data-form]').forEach((form) => form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form).entries());
-  const message = Object.entries(values).map(([key, value]) => `${key}: ${value}`).join('\n');
-  window.open(makeWhatsAppUrl(`Hello EcoPower, I would like to get in touch.\n${message}`), '_blank', 'noopener');
   const status = form.querySelector('.form-message');
-  if (status) {
-    status.textContent = document.documentElement.lang === 'sw' ? 'Asante. WhatsApp imefunguliwa na ujumbe wako. Bonyeza Tuma.' : 'Thanks. WhatsApp opened with your message. Tap Send to complete the enquiry.';
-    status.classList.add('is-visible');
+  const message = Object.entries(values).map(([key, value]) => `${key}: ${value}`).join('\n');
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, type: form.dataset.formType || 'contact' }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Message could not be saved.');
+    if (status) {
+      status.textContent = document.documentElement.lang === 'sw' ? 'Asante. Ujumbe wako umehifadhiwa. Tutawasiliana nawe.' : 'Thanks. Your message has been received. We will get back to you.';
+      status.classList.add('is-visible');
+    }
+    form.reset();
+  } catch {
+    window.open(makeWhatsAppUrl(`Hello EcoPower, I would like to get in touch.\n${message}`), '_blank', 'noopener');
+    if (status) {
+      status.textContent = document.documentElement.lang === 'sw' ? 'WhatsApp imefunguliwa na ujumbe wako. Bonyeza Tuma.' : 'WhatsApp opened with your message. Tap Send to complete the enquiry.';
+      status.classList.add('is-visible');
+    }
+  } finally {
+    if (button) button.disabled = false;
   }
-  form.reset();
 }));
 
 const revealSelectors = [
@@ -544,3 +808,5 @@ if (revealImmediately || !('IntersectionObserver' in window)) {
 
 const storedLanguage = localStorage.getItem('ecopower-language') || document.documentElement.lang || 'en';
 setLanguage(storedLanguage);
+if (document.body.dataset.page === 'home' && new URLSearchParams(window.location.search).get('externalPreview') === '1') void syncCmsHomeContent(storedLanguage, true);
+if (window.parent !== window) window.parent.postMessage({ type: 'ecopower-cms-preview-ready' }, window.location.origin);

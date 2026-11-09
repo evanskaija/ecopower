@@ -272,7 +272,6 @@ h1, h2, h3 { letter-spacing: -.045em; }
 .home-partner-logos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
 .home-partner-logo { display: grid; place-items: center; min-height: 72px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
 .home-partner-logo img { width: 100%; height: 54px; object-fit: contain; }
-.home-partner-logo-text span { color: #173c6b; font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; letter-spacing: .04em; }
 .home-footer { padding-top: 50px; }
 .home-footer .footer-name { display: inline-block; color: var(--white); font-family: Manrope, sans-serif; font-size: 16px; font-weight: 800; }
 .home-footer h3 { color: var(--white); font-size: 13px; letter-spacing: 0; text-transform: none; }
@@ -680,8 +679,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
 .partners-funders-intro { max-width: 700px; color: var(--muted); font-size: 15px; line-height: 1.6; }
 .partners-funders-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 23px; }
 .partners-funder-card { padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
-.partners-funder-card img, .partners-funder-card .partners-tirdo { width: 100%; height: 82px; object-fit: contain; }
-.partners-tirdo { display: grid; place-items: center; color: #173c6b; font-family: Manrope, sans-serif; font-size: 26px; font-weight: 800; letter-spacing: .03em; }
+.partners-funder-card img { width: 100%; height: 82px; object-fit: contain; }
 .partners-funder-card span { display: block; margin-top: 12px; color: var(--forest); font-size: 13px; font-weight: 700; line-height: 1.35; }
 
 @media (max-width: 1040px) {
@@ -705,7 +703,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .partners-business-panel h2 { font-size: 31px; }
   .partners-funders-grid { grid-template-columns: 1fr 1fr; gap: 11px; }
   .partners-funder-card { padding: 12px; }
-  .partners-funder-card img, .partners-funder-card .partners-tirdo { height: 63px; }
+  .partners-funder-card img { height: 63px; }
   .partners-funder-card span { margin-top: 9px; font-size: 11px; }
 }
 

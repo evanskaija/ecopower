@@ -148,6 +148,16 @@ function withBlocks(content, blocks) {
   return { ...source, blocks: Array.isArray(blocks) ? blocks : [] };
 }
 function currentBlockRecord(row) { return withBlocks(parseJson(row.content_json), parseJson(row.blocks_json)); }
+const TIRDO_PARTNER_IMAGE = 'EcoPower_all_extracted_images/TIRDO_logo_from_EcoPower_PDF.png';
+function normalizeHomeContent(slug, content) {
+  if (slug !== 'home' || !content?.images || !Array.isArray(content.images.partnerLogos)) return content;
+  if (content.images.partnerLogos.some((item) => item?.image === TIRDO_PARTNER_IMAGE)) return content;
+  content.images = {
+    ...content.images,
+    partnerLogos: [...content.images.partnerLogos, { image: TIRDO_PARTNER_IMAGE, en: { alt: 'TIRDO' }, sw: { alt: 'TIRDO' }, position: 'center' }]
+  };
+  return content;
+}
 function blockCopy(block, language) { return block?.[language] || block?.en || block?.sw || {}; }
 function validateBlockText(value, label, max = BLOCK_TEXT_LIMIT) {
   if (value === undefined || value === null) return null;
@@ -258,13 +268,13 @@ function currentContent(slug, status, language) {
   const id = pageId(slug);
   if (!id) return null;
   const row = db.prepare('SELECT id, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ? AND language = ?').get(id, status, language);
-  return row ? { id: row.id, version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at } : null;
+  return row ? { id: row.id, version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at } : null;
 }
 
 function allContent(slug, status) {
   const id = pageId(slug);
   if (!id) return {};
-  return Object.fromEntries(db.prepare('SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at }]));
+  return Object.fromEntries(db.prepare('SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
 }
 
 function saveContent(slug, status, content, userId, language = 'en') {

@@ -128,6 +128,16 @@ function withBlocks(content, blocks) {
   return { ...source, blocks: Array.isArray(blocks) ? blocks : [] };
 }
 function currentBlockRecord(row) { return withBlocks(parseJson(row.content_json), parseJson(row.blocks_json)); }
+const TIRDO_PARTNER_IMAGE = 'EcoPower_all_extracted_images/TIRDO_logo_from_EcoPower_PDF.png';
+function normalizeHomeContent(slug, content) {
+  if (slug !== 'home' || !content?.images || !Array.isArray(content.images.partnerLogos)) return content;
+  if (content.images.partnerLogos.some((item) => item?.image === TIRDO_PARTNER_IMAGE)) return content;
+  content.images = {
+    ...content.images,
+    partnerLogos: [...content.images.partnerLogos, { image: TIRDO_PARTNER_IMAGE, en: { alt: 'TIRDO' }, sw: { alt: 'TIRDO' }, position: 'center' }]
+  };
+  return content;
+}
 function blockCopy(block, language) { return block?.[language] || block?.en || block?.sw || {}; }
 function validateBlockText(value, label, max = BLOCK_TEXT_LIMIT) {
   if (value === undefined || value === null) return null;
@@ -232,13 +242,13 @@ async function currentContent(executor, slug, status, language) {
   const id = await pageId(executor, slug);
   if (!id) return null;
   const row = (await query(executor, 'SELECT id, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
-  return row ? { id: row.id, version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at } : null;
+  return row ? { id: row.id, version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at } : null;
 }
 async function allContent(executor, slug, status) {
   const id = await pageId(executor, slug);
   if (!id) return {};
   const result = await query(executor, 'SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2', [id, status]);
-  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at }]));
+  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
 }
 async function saveContent(executor, slug, status, content, userId, language = 'en') {
   const id = await pageId(executor, slug);

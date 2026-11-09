@@ -153,6 +153,7 @@
   let mediaFocusReturn = null;
   let previewMode = 'draft';
   let mediaTarget = null;
+  let mediaSearch = '';
   let mediaBusy = false;
   let toastTimer;
   let currentUser = null;
@@ -378,7 +379,7 @@
       state.media = initialMedia.concat((media.media || []).map((item) => ({ ...item, name: item.original_name, uploaded: true })));
       updateDashboardMetrics();
       renderSectionList();
-      renderForm(false);
+      renderForm(!isDashboard);
       updatePreview();
       $('#draft-status').textContent = page.draft?.[language] ? 'Draft loaded from database' : 'No draft saved yet';
       $('#draft-status').classList.toggle('is-saved', Boolean(page.draft?.[language]));
@@ -402,7 +403,7 @@
     document.querySelector('.admin-breadcrumb span').textContent = 'Website Pages';
     document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.page === slug));
     document.querySelector('.admin-breadcrumb strong').textContent = pageMeta[slug].label;
-    document.querySelector('#page-editor-view .admin-heading-row h1').textContent = `${pageMeta[slug].label} page`;
+    document.querySelector('#page-editor-title').textContent = pageMeta[slug].label;
     document.querySelector('#page-editor-view .admin-subtitle').textContent = `Manage the ${pageMeta[slug].label} content. Draft changes stay private until you publish.`;
     document.querySelector('.admin-notice strong').textContent = `${pageMeta[slug].label} editor`;
     document.querySelector('.admin-notice p').lastChild.textContent = ` — Edit the actual sections, images and content on this public page. Changes stay private until you publish.`;
@@ -623,7 +624,24 @@
     document.body.classList.remove('modal-open', 'media-picker-open');
   }
 
+  function ensureInlineEditorPanel() {
+    const drawer = $('#editor-drawer');
+    const workspace = document.querySelector('.admin-workspace');
+    if (drawer && workspace && drawer.parentElement !== workspace) workspace.appendChild(drawer);
+  }
+
+  function openEditorPanel() {
+    const drawer = $('#editor-drawer');
+    if (!drawer) return;
+    drawer.hidden = false;
+    drawer.setAttribute('aria-hidden', 'false');
+    drawer.classList.add('open');
+    $('#drawer-backdrop').hidden = true;
+    syncModalScrollLock();
+  }
+
   resetTransientModals();
+  ensureInlineEditorPanel();
   window.addEventListener('pageshow', resetTransientModals);
 
   function ensureMediaModalPortal() {
@@ -939,7 +957,7 @@
     if (block.type === 'testimonial') html += `${mediaPicker('Customer image', 'image', block.image, { positionPath: 'position' })}${field('Customer name', `${language}.title`, copy.title || '')}${field('Testimonial', `${language}.quote`, copy.quote || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Attribution', `${language}.attribution`, copy.attribution || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'cta') html += `${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     $('#section-form').innerHTML = html;
-    if (open) { drawer.setAttribute('aria-hidden', 'false'); drawer.classList.add('open'); $('#drawer-backdrop').hidden = false; syncModalScrollLock(); }
+    if (open) openEditorPanel();
   }
 
   function pendingMediaPicker(label, path, value, options = {}) {
@@ -1054,22 +1072,25 @@
   }
   function moveNested(items, index, delta) { const next = index + delta; if (!Array.isArray(items) || index < 0 || next < 0 || next >= items.length) return; [items[index], items[next]] = [items[next], items[index]]; }
 
-  function sectionActionButtons(id, isDynamic = false) {
-    if (isDynamic) return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button></div>`;
+  function sectionActionButtons(id, isDynamic = false, isHidden = false) {
+    const visibilityAction = isDynamic ? 'toggle-block' : 'toggle-section';
+    const visibilityAttribute = isDynamic ? `data-block-id="${escapeHtml(id.replace(/^block:/, ''))}"` : `data-section="${escapeHtml(id)}"`;
+    const visibilityLabel = isHidden ? 'Show on website' : 'Hide from website';
+    if (isDynamic) return `<div class="section-row-actions"><button class="section-visibility-button" data-action="${visibilityAction}" ${visibilityAttribute} aria-pressed="${String(!isHidden)}" title="${visibilityLabel}">${isHidden ? '○' : '●'}</button><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit <span aria-hidden="true">›</span></button></div>`;
     const addButton = canAddContent(id) ? `<button class="section-action add-content-action" data-action="open-add-content" data-section="${escapeHtml(id)}">Add Content</button>` : '';
-    return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button>${addButton}</div>`;
+    return `<div class="section-row-actions"><button class="section-visibility-button" data-action="${visibilityAction}" ${visibilityAttribute} aria-pressed="${String(!isHidden)}" title="${visibilityLabel}">${isHidden ? '○' : '●'}</button><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit <span aria-hidden="true">›</span></button>${addButton}</div>`;
   }
 
   function staticSectionRow(id, label, description, index) {
     const hidden = sectionIsHidden(id);
     const dirty = activePage === 'home' ? sectionIsDirty(id) : pageIsDirty();
-    return `<div class="section-row ${id === activeSection ? 'active' : ''} ${hidden ? 'is-hidden' : ''}" data-section="${escapeHtml(id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${dirty ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${hidden ? 'Hidden on the public page' : escapeHtml(description)}</small></div>${sectionActionButtons(id)}</div>`;
+    return `<div class="section-row ${id === activeSection ? 'active' : ''} ${hidden ? 'is-hidden' : ''}" data-section="${escapeHtml(id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${dirty ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${hidden ? 'Hidden on the public page' : escapeHtml(description)}</small></div>${sectionActionButtons(id, false, hidden)}</div>`;
   }
 
   function dynamicBlockRow(block, index) {
     const copy = blockCopyForEditor(block, language);
     const label = copy.heading || copy.title || ({ text: 'Added text', image: 'Added image', imageText: 'Added image and text', cards: 'Added products', gallery: 'Added gallery', product: 'Added briquette', payment: 'Added payment content', stove: 'Added stove', partner: 'Added partner', testimonial: 'Added customer testimonial', cta: 'Added call to action' }[block.type] || 'Added content');
-    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Added content'}</small></div>${sectionActionButtons(`block:${block.id}`, true)}</div>`;
+    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Added content'}</small></div>${sectionActionButtons(`block:${block.id}`, true, block.visible === false)}</div>`;
   }
 
   function orderedSectionRows(entries, content) {
@@ -1152,12 +1173,7 @@
       const label = element.label || `${element.tag.toUpperCase()} ${String(element.index + 1).padStart(2, '0')}`;
       return `${field(label, `elements.${fullIndex}.value`, element.value, { textarea: ['p', 'a', 'button'].includes(element.tag) })}${element.tag === 'a' ? field('Link URL', `elements.${fullIndex}.href`, element.href || '') : ''}`;
     }).join('') : '<p class="form-intro">This page has no editable content yet.</p>';
-    if (open) {
-      $('#editor-drawer').setAttribute('aria-hidden', 'false');
-      $('#editor-drawer').classList.add('open');
-      $('#drawer-backdrop').hidden = false;
-      syncModalScrollLock();
-    }
+    if (open) openEditorPanel();
   }
 
   function renderForm(open = true) {
@@ -1173,12 +1189,7 @@
     const section = state.draft[source];
     const forms = { hero: renderHero, trust: renderTrust, products: renderProducts, ordering: renderOrdering, payment: renderPayment, factory: renderFactory, kitchen: renderKitchen, testimonial: renderTestimonial, cookstoves: renderCookstoves, impact: renderImpact, partners: renderPartners, images: renderImages, footer: renderFooter };
     $('#section-form').innerHTML = forms[activeSection](section);
-    if (open) {
-      drawer.setAttribute('aria-hidden', 'false');
-      drawer.classList.add('open');
-      $('#drawer-backdrop').hidden = false;
-      syncModalScrollLock();
-    }
+    if (open) openEditorPanel();
   }
 
   function renderSectionList() {
@@ -1194,6 +1205,17 @@
     const rows = orderedSectionRows(groups.map((group) => ({ id: group.id, label: group.label, description: `${content.elements.filter((element) => (element.group || 'content') === group.id).length} editable fields` })), content);
     $('#section-count').textContent = `${groups.length + dynamicBlocks(content).length} page sections`;
     $('#section-list').innerHTML = rows;
+    updateSelectedSectionAddButton();
+  }
+
+  function updateSelectedSectionAddButton() {
+    const button = $('#selected-section-add');
+    const context = document.querySelector('.panel-context');
+    if (context) context.textContent = `(${pageMeta[activePage]?.label || 'Home'})`;
+    if (!button) return;
+    const allowed = activePage === 'home' && canAddContent(activeSection);
+    button.hidden = !allowed;
+    button.dataset.section = activeSection;
   }
 
   function renderSectionList() {
@@ -1201,6 +1223,7 @@
     const rows = orderedSectionRows(sectionMeta.map(([id, label, description]) => ({ id, label, description })), state.draft);
     $('#section-count').textContent = `${sectionMeta.length + dynamicBlocks(state.draft).length} sections`;
     $('#section-list').innerHTML = rows;
+    updateSelectedSectionAddButton();
   }
 
   function sendPreview() {
@@ -1265,16 +1288,37 @@
 
   function closeDrawer({ force = false } = {}) {
     if (!force && !confirmCloseEditor()) return false;
-    $('#editor-drawer').classList.remove('open');
-    $('#editor-drawer').setAttribute('aria-hidden', 'true');
+    const drawer = $('#editor-drawer');
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    if (drawer.parentElement?.classList.contains('admin-workspace')) drawer.hidden = true;
     $('#drawer-backdrop').hidden = true;
     editorSession = null;
     syncModalScrollLock();
     return true;
   }
 
+  function updateMediaPreview(src) {
+    const item = state.media.find((candidate) => candidate.src === src);
+    const image = $('#media-preview-image');
+    const empty = $('#media-preview-empty');
+    const name = $('#media-preview-name');
+    const help = $('#media-preview-help');
+    if (!item || !image || !empty || !name || !help) return;
+    image.src = assetUrl(item.src);
+    image.alt = item.name || 'Selected image';
+    image.hidden = false;
+    empty.hidden = true;
+    name.textContent = item.name || 'Selected image';
+    help.textContent = 'Click the image card to use it. Position and cropping remain editable in the section controls.';
+  }
+
   function renderMedia() {
-    $('#media-grid').innerHTML = state.media.map((item) => `<button class="media-card" data-action="select-media" data-src="${escapeHtml(item.src)}"><img src="${assetUrl(item.src)}" alt="" /><strong>${escapeHtml(item.name)}</strong><small>${mediaAssignment(item.src) || (item.uploaded ? 'Uploaded asset' : 'Existing website asset')}</small></button>`).join('');
+    const query = mediaSearch.trim().toLowerCase();
+    const visibleMedia = state.media.filter((item) => !query || `${item.name || ''} ${item.src || ''}`.toLowerCase().includes(query));
+    const count = $('#media-library-count');
+    if (count) count.textContent = `${visibleMedia.length} of ${state.media.length} assets`;
+    $('#media-grid').innerHTML = visibleMedia.map((item) => `<button class="media-card" data-action="select-media" data-src="${escapeHtml(item.src)}"><img src="${assetUrl(item.src)}" alt="" /><strong>${escapeHtml(item.name)}</strong><small>${mediaAssignment(item.src) || (item.uploaded ? 'Uploaded asset' : 'Existing website asset')}</small></button>`).join('') || '<p class="media-empty-state">No matching media assets.</p>';
   }
 
   function openMedia(section, path, { intentional = false } = {}) {
@@ -1284,6 +1328,16 @@
     ensureMediaModalPortal();
     mediaFocusReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     mediaTarget = { section, path };
+    mediaSearch = '';
+    if ($('#media-search')) $('#media-search').value = '';
+    const previewImage = $('#media-preview-image');
+    const previewEmpty = $('#media-preview-empty');
+    const previewName = $('#media-preview-name');
+    const previewHelp = $('#media-preview-help');
+    if (previewImage) { previewImage.hidden = true; previewImage.removeAttribute('src'); }
+    if (previewEmpty) previewEmpty.hidden = false;
+    if (previewName) previewName.textContent = 'No image selected';
+    if (previewHelp) previewHelp.textContent = 'Choose an existing image or upload a new one. Position and cropping remain editable in the section controls.';
     $('#media-upload').value = '';
     $('#media-url').value = '';
     $('#media-alt-text').value = '';
@@ -1496,7 +1550,7 @@
     const action = target.dataset.action;
     if (action === 'toggle-sidebar') { document.body.classList.toggle('sidebar-collapsed'); return; }
     if (action === 'dashboard') { showDashboard(); return; }
-    if (action === 'open-pages') { if (!closeMedia() || !closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(false); return; }
+    if (action === 'open-pages') { if (!closeMedia() || !closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(true); return; }
     if (action === 'logout') {
       apiRequest('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }).catch(() => {}).finally(() => showLogin('You have been signed out.'));
       return;
@@ -1690,6 +1744,19 @@
     } finally {
       setMediaBusy(false);
     }
+  });
+
+  $('#media-search').addEventListener('input', (event) => {
+    mediaSearch = event.target.value;
+    renderMedia();
+  });
+  $('#media-grid').addEventListener('pointerover', (event) => {
+    const card = event.target.closest('.media-card');
+    if (card?.dataset.src) updateMediaPreview(card.dataset.src);
+  });
+  $('#media-grid').addEventListener('focusin', (event) => {
+    const card = event.target.closest('.media-card');
+    if (card?.dataset.src) updateMediaPreview(card.dataset.src);
   });
 
   $('#login-form').addEventListener('submit', async (event) => {

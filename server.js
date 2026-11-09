@@ -43,7 +43,7 @@ function createDatabase() {
   db.pragma('foreign_keys = ON');
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const appliedMigrations = db.prepare('SELECT id FROM schema_migrations').all().map((row) => row.id);
-  const migrationFiles = fs.readdirSync(path.join(ROOT, 'migrations')).filter((file) => file === '001_init.sql').sort();
+  const migrationFiles = fs.readdirSync(path.join(ROOT, 'migrations')).filter((file) => /^\d+_.*\.sql$/i.test(file) && !/_postgres\.sql$/i.test(file)).sort();
   for (const migrationFile of migrationFiles) {
     if (appliedMigrations.includes(migrationFile)) continue;
     const migration = fs.readFileSync(path.join(ROOT, 'migrations', migrationFile), 'utf8');
@@ -123,6 +123,88 @@ function safeJson(value) { return JSON.stringify(value ?? {}); }
 function parseJson(value) { try { return JSON.parse(value); } catch { return {}; } }
 function publicUrlFor(fileName) { return `/uploads/published/${encodeURIComponent(fileName)}`; }
 function cleanEmail(value) { return String(value || '').trim().toLowerCase(); }
+const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery']);
+const BLOCK_ID = /^[a-z0-9][a-z0-9_-]{1,79}$/i;
+const BLOCK_IMAGE_LIMIT = 50;
+const BLOCK_CARD_LIMIT = 30;
+const BLOCK_TEXT_LIMIT = 4000;
+function splitBlocks(content) {
+  const source = content && typeof content === 'object' && !Array.isArray(content) ? { ...content } : {};
+  const blocks = Array.isArray(source.blocks) ? source.blocks : [];
+  delete source.blocks;
+  return { content: source, blocks };
+}
+function withBlocks(content, blocks) {
+  const source = content && typeof content === 'object' && !Array.isArray(content) ? { ...content } : {};
+  return { ...source, blocks: Array.isArray(blocks) ? blocks : [] };
+}
+function currentBlockRecord(row) { return withBlocks(parseJson(row.content_json), parseJson(row.blocks_json)); }
+function blockCopy(block, language) { return block?.[language] || block?.en || block?.sw || {}; }
+function validateBlockText(value, label, max = BLOCK_TEXT_LIMIT) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return `${label} must be text.`;
+  if (value.length > max) return `${label} is too long.`;
+  return null;
+}
+function validateBlock(block, index, slug) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return `Invalid dynamic block ${index + 1} on ${slug}.`;
+  if (!DYNAMIC_BLOCK_TYPES.has(block.type)) return `Unsupported dynamic block type on ${slug}.`;
+  if (typeof block.id !== 'string' || !BLOCK_ID.test(block.id)) return `Dynamic block ${index + 1} has an invalid ID.`;
+  if (block.visible !== undefined && typeof block.visible !== 'boolean') return `Dynamic block ${block.id} visibility must be boolean.`;
+  if (block.type === 'imageText' && !['left', 'right'].includes(block.layout || 'left')) return `Dynamic block ${block.id} image alignment is invalid.`;
+  if (['image', 'imageText'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
+  if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic block ${block.id} has an invalid image reference.`;
+  const languages = ['en', 'sw'];
+  for (const language of languages) {
+    const copy = blockCopy(block, language);
+    for (const [key, max] of [['heading', 180], ['subheading', 180], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['buttonLabel', 100], ['buttonLink', 1000], ['alt', 250], ['caption', 300]]) {
+      const error = validateBlockText(copy[key], `Dynamic block ${block.id} ${language}.${key}`, max);
+      if (error) return error;
+    }
+    if (copy.buttonLink && !SAFE_HREF.test(copy.buttonLink)) return `Dynamic block ${block.id} has an invalid button link.`;
+  }
+  if (block.type === 'cards') {
+    if (!Array.isArray(block.cards) || block.cards.length > BLOCK_CARD_LIMIT) return `Dynamic block ${block.id} can contain at most ${BLOCK_CARD_LIMIT} cards.`;
+    for (const [cardIndex, card] of block.cards.entries()) {
+      if (!card || typeof card !== 'object' || typeof card.id !== 'string' || !BLOCK_ID.test(card.id)) return `Dynamic block ${block.id} card ${cardIndex + 1} has an invalid ID.`;
+      if (card.image && (!SAFE_IMAGE.test(card.image) || validateImageReference(card.image))) return `Dynamic block ${block.id} card ${card.id} has an invalid image reference.`;
+      for (const language of languages) {
+        const copy = blockCopy(card, language);
+        for (const [key, max] of [['title', 180], ['description', BLOCK_TEXT_LIMIT], ['alt', 250]]) {
+          const error = validateBlockText(copy[key], `Dynamic block ${block.id} card ${card.id} ${language}.${key}`, max);
+          if (error) return error;
+        }
+      }
+    }
+  }
+  if (block.type === 'gallery') {
+    if (!Array.isArray(block.images) || block.images.length > BLOCK_IMAGE_LIMIT) return `Dynamic block ${block.id} can contain at most ${BLOCK_IMAGE_LIMIT} gallery images.`;
+    for (const [imageIndex, item] of block.images.entries()) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !BLOCK_ID.test(item.id) || typeof item.image !== 'string' || !item.image) return `Dynamic block ${block.id} gallery image ${imageIndex + 1} is invalid.`;
+      if (!SAFE_IMAGE.test(item.image) || validateImageReference(item.image)) return `Dynamic block ${block.id} gallery image ${item.id} has an invalid image reference.`;
+      for (const language of languages) {
+        const copy = blockCopy(item, language);
+        for (const [key, max] of [['caption', 300], ['alt', 250]]) {
+          const error = validateBlockText(copy[key], `Dynamic block ${block.id} gallery image ${item.id} ${language}.${key}`, max);
+          if (error) return error;
+        }
+      }
+    }
+  }
+  return null;
+}
+function validateBlocks(slug, blocks) {
+  if (blocks === undefined) return null;
+  if (!Array.isArray(blocks) || blocks.length > BLOCK_IMAGE_LIMIT) return `A page can contain at most ${BLOCK_IMAGE_LIMIT} dynamic blocks.`;
+  const ids = new Set();
+  for (const [index, block] of blocks.entries()) {
+    if (ids.has(block?.id)) return `Dynamic block IDs must be unique on ${slug}.`;
+    ids.add(block?.id);
+    const error = validateBlock(block, index, slug);
+    if (error) return error;
+  }
+  return null;
+}
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: 'Authentication required.' });
@@ -146,14 +228,14 @@ function sameOrigin(req, res, next) {
 function currentContent(slug, status, language) {
   const id = pageId(slug);
   if (!id) return null;
-  const row = db.prepare('SELECT id, version, content_json, updated_at FROM page_content WHERE page_id = ? AND status = ? AND language = ?').get(id, status, language);
-  return row ? { id: row.id, version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at } : null;
+  const row = db.prepare('SELECT id, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ? AND language = ?').get(id, status, language);
+  return row ? { id: row.id, version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at } : null;
 }
 
 function allContent(slug, status) {
   const id = pageId(slug);
   if (!id) return {};
-  return Object.fromEntries(db.prepare('SELECT language, version, content_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at }]));
+  return Object.fromEntries(db.prepare('SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at }]));
 }
 
 function saveContent(slug, status, content, userId, language = 'en') {
@@ -161,9 +243,10 @@ function saveContent(slug, status, content, userId, language = 'en') {
   if (!id) throw new Error('Unknown page.');
   const existing = db.prepare('SELECT version FROM page_content WHERE page_id = ? AND status = ? AND language = ?').get(id, status, language);
   const version = (existing?.version || 0) + 1;
-  db.prepare(`INSERT INTO page_content (page_id, language, status, content_json, version, created_by, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(page_id, language, status) DO UPDATE SET content_json = excluded.content_json, version = excluded.version, created_by = excluded.created_by, updated_at = CURRENT_TIMESTAMP`).run(id, language, status, safeJson(content), version, userId);
+  const split = splitBlocks(content);
+  db.prepare(`INSERT INTO page_content (page_id, language, status, content_json, blocks_json, version, created_by, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(page_id, language, status) DO UPDATE SET content_json = excluded.content_json, blocks_json = excluded.blocks_json, version = excluded.version, created_by = excluded.created_by, updated_at = CURRENT_TIMESTAMP`).run(id, language, status, safeJson(split.content), safeJson(split.blocks), version, userId);
   return { version };
 }
 
@@ -227,7 +310,7 @@ function audit(req, action, target, metadata = {}) {
 
 const EDITABLE_SELECTORS = new Set(['main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', 'main img, footer img']);
 const SAFE_HREF = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i;
-const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
+const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/(?:jpeg|png|webp|avif|gif);base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif|gif)(?:[?#].*)?)$/i;
 function validateStructuredImages(value, pathName = 'content') {
   if (Array.isArray(value)) {
     for (const [index, item] of value.entries()) {
@@ -255,6 +338,8 @@ async function validateContent(slug, content) {
   if (serialized.length > 2 * 1024 * 1024) return 'Content payload is too large.';
   const structuredImageError = validateStructuredImages(content);
   if (structuredImageError) return `${structuredImageError} on ${slug}.`;
+  const blockError = validateBlocks(slug, content?.blocks);
+  if (blockError) return blockError;
   const externalImageUrls = collectExternalImageUrls(content);
   if (Array.isArray(content?.elements)) content.elements.forEach((element) => { if (element?.kind === 'image' && /^https:\/\//i.test(element.value || '')) externalImageUrls.push(element.value); });
   for (const url of new Set(externalImageUrls)) {
@@ -331,7 +416,10 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
     const publishTransaction = db.transaction(() => {
       for (const language of languages) {
         const current = currentContent(req.params.slug, 'published', language);
-        if (current) db.prepare('INSERT INTO content_revisions (page_id, language, version, content_json, created_by) VALUES (?, ?, ?, ?, ?)').run(page.id, language, current.version, safeJson(current.content), req.user.id);
+        if (current) {
+          const split = splitBlocks(current.content);
+          db.prepare('INSERT INTO content_revisions (page_id, language, version, content_json, blocks_json, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(page.id, language, current.version, safeJson(split.content), safeJson(split.blocks), req.user.id);
+        }
         saveContent(req.params.slug, 'published', materialized[language], req.user.id, language);
       }
     });
@@ -345,9 +433,9 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
 });
 
 app.post('/api/pages/:slug/restore/:revisionId', requireAuth, requireRole('owner', 'admin'), (req, res) => {
-  const revision = db.prepare('SELECT page_id, language, content_json FROM content_revisions WHERE id = ?').get(Number(req.params.revisionId));
+  const revision = db.prepare('SELECT page_id, language, content_json, blocks_json FROM content_revisions WHERE id = ?').get(Number(req.params.revisionId));
   if (!revision || revision.page_id !== pageId(req.params.slug)) return res.status(404).json({ error: 'Revision not found.' });
-  saveContent(req.params.slug, 'draft', parseJson(revision.content_json), req.user.id, revision.language);
+  saveContent(req.params.slug, 'draft', withBlocks(parseJson(revision.content_json), parseJson(revision.blocks_json)), req.user.id, revision.language);
   audit(req, 'revision.restore', req.params.slug, { revisionId: revision.id });
   res.json({ ok: true, draft: allContent(req.params.slug, 'draft') });
 });

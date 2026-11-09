@@ -96,6 +96,8 @@
     footer: { en: { brand: 'EcoPower Solutions Ltd', description: 'Makange — Kwa maisha bora. Clean cooking fuel, delivered to your door.', contactHeading: 'Order & contact', phone: 'Call / WhatsApp: 0784 017 225', email: 'info@ecopower.co.tz', address: 'Old Bagamoyo Road, Plot 234, Block D, Silver Sands, Kunduchi, Dar es Salaam', paymentHeading: 'Pay', mpesa: 'M-Pesa Lipa Namba 352491280', crdb: 'CRDB Lipa Namba 104084772', cash: 'Cash on delivery', socialHeading: 'Follow us', socialOne: 'Instagram · Facebook · TikTok', socialTwo: 'LinkedIn (company page) · Google' }, sw: { brand: 'EcoPower Solutions Ltd', description: 'Makange — Kwa maisha bora. Nishati safi ya kupikia, ikiletwa mlangoni kwako.', contactHeading: 'Agizo na mawasiliano', phone: 'Piga simu / WhatsApp: 0784 017 225', email: 'info@ecopower.co.tz', address: 'Old Bagamoyo Road, Plot 234, Block D, Silver Sands, Kunduchi, Dar es Salaam', paymentHeading: 'Malipo', mpesa: 'M-Pesa Lipa Namba 352491280', crdb: 'CRDB Lipa Namba 104084772', cash: 'Lipa wakati wa kupokea', socialHeading: 'Tufuatilie', socialOne: 'Instagram · Facebook · TikTok', socialTwo: 'LinkedIn (ukurasa wa kampuni) · Google' } }
   };
 
+  baseContent.blocks = [];
+
   const initialMedia = [
     ['hero-brand', 'Makange brand mark', 'EcoPower_all_extracted_images/page_01_image_002.png'],
     ['hero-delivery', 'Hero delivery tricycle', 'EcoPower_all_extracted_images/page_01_image_003.jpeg'],
@@ -135,6 +137,9 @@
   let language = 'en';
   let activePage = 'home';
   let activeSection = 'hero';
+  let isDashboard = false;
+  let pendingContentSection = 'hero';
+  let addContentDraft = null;
   let previewMode = 'draft';
   let mediaTarget = null;
   let toastTimer;
@@ -156,7 +161,6 @@
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeMediaForCompare(item)]));
     return value;
   }
-  const sectionIsDirty = (id) => JSON.stringify(normalizeMediaForCompare(state.draft[id])) !== JSON.stringify(normalizeMediaForCompare(state.published[id]));
   function findMediaPath(value, target, path = []) {
     if (value === target) return path;
     if (Array.isArray(value)) { for (let index = 0; index < value.length; index += 1) { const found = findMediaPath(value[index], target, [...path, index]); if (found) return found; } }
@@ -183,7 +187,7 @@
   }
 
   function setCmsBusy(busy) {
-    document.querySelectorAll('[data-action="save-draft"], [data-action="publish"]').forEach((button) => {
+    document.querySelectorAll('[data-action="save-draft"], [data-action="publish"], [data-action="commit-add-content"]').forEach((button) => {
       button.disabled = busy;
       button.setAttribute('aria-busy', String(busy));
     });
@@ -312,6 +316,7 @@
       if (activePage === 'home') applyRemotePage(page);
       else await applyGenericRemotePage(activePage, page);
       state.media = initialMedia.concat((media.media || []).map((item) => ({ ...item, name: item.original_name, uploaded: true })));
+      updateDashboardMetrics();
       renderSectionList();
       renderForm(false);
       updatePreview();
@@ -324,13 +329,18 @@
   }
 
   async function switchPage(slug, trigger) {
-    if (!pageMeta[slug] || slug === activePage) return;
+    if (!pageMeta[slug] || (slug === activePage && !isDashboard)) return;
     activePage = slug;
+    isDashboard = false;
     activeSection = slug === 'home' ? 'hero' : 'generic-text';
+    $('#dashboard-view').hidden = true;
+    $('#page-editor-view').hidden = false;
+    document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'toggle-pages'));
+    document.querySelector('.admin-breadcrumb span').textContent = 'Website Pages';
     document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.page === slug));
     document.querySelector('.admin-breadcrumb strong').textContent = pageMeta[slug].label;
-    document.querySelector('.admin-content h1').textContent = `${pageMeta[slug].label} page`;
-    document.querySelector('.admin-subtitle').textContent = `Manage the ${pageMeta[slug].label} content. Draft changes stay private until you publish.`;
+    document.querySelector('#page-editor-view .admin-heading-row h1').textContent = `${pageMeta[slug].label} page`;
+    document.querySelector('#page-editor-view .admin-subtitle').textContent = `Manage the ${pageMeta[slug].label} content. Draft changes stay private until you publish.`;
     document.querySelector('.admin-notice strong').textContent = `${pageMeta[slug].label} editor`;
     document.querySelector('.admin-notice p').lastChild.textContent = ` — Edit the actual sections, images and content on this public page. Changes stay private until you publish.`;
     $('#preview-frame').src = previewUrl(slug);
@@ -339,6 +349,35 @@
     try { await loadRemoteState(); showToast(`${pageMeta[slug].label} editor loaded.`); } catch (error) { showToast(`Could not load this page: ${error.message}`); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (trigger) trigger.blur();
+  }
+
+  function updateDashboardMetrics() {
+    const mediaCount = $('#dashboard-media-count');
+    const draftCount = $('#dashboard-draft-count');
+    if (mediaCount) mediaCount.textContent = String(state.media.length);
+    if (draftCount) {
+      const records = activePage === 'home' ? state.draftRecords : (genericState()?.draftRecords || {});
+      draftCount.textContent = String(Object.keys(records || {}).length);
+    }
+  }
+  function showDashboard() {
+    isDashboard = true;
+    $('#dashboard-view').hidden = false;
+    $('#page-editor-view').hidden = true;
+    document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'dashboard'));
+    document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.remove('active'));
+    document.querySelector('.admin-breadcrumb span').textContent = 'Dashboard';
+    document.querySelector('.admin-breadcrumb strong').textContent = 'Overview';
+    updateDashboardMetrics();
+  }
+  function showPageEditor() {
+    isDashboard = false;
+    $('#dashboard-view').hidden = true;
+    $('#page-editor-view').hidden = false;
+    document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'toggle-pages'));
+    document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.page === activePage));
+    document.querySelector('.admin-breadcrumb span').textContent = 'Website Pages';
+    document.querySelector('.admin-breadcrumb strong').textContent = pageMeta[activePage].label;
   }
 
   function applyRemotePage(data) {
@@ -350,6 +389,8 @@
     // fallback cannot win while the editor is hydrating a saved draft.
     state.draft = draftSource ? clone(draftSource) : clone(publishedSource || baseContent);
     state.published = publishedSource ? clone(publishedSource) : clone(baseContent);
+    if (!Array.isArray(state.draft.blocks)) state.draft.blocks = [];
+    if (!Array.isArray(state.published.blocks)) state.published.blocks = [];
     state.revisions = (data.revisions || []).map((revision) => ({ id: revision.id, createdAt: revision.created_at, version: revision.version, language: revision.language }));
   }
 
@@ -385,7 +426,7 @@
         position: definition.kind === 'image' ? 'center' : undefined
       };
     }).filter(Boolean);
-    return { elements };
+    return { elements, blocks: [], sectionOrder: [], hiddenSections: [] };
   }
 
   function normalizeGenericContent(slug, content, defaults) {
@@ -404,12 +445,17 @@
       if (!element || used.has(element)) return;
       elements.push({ ...element, field_id: element.field_id || `${slug}.legacy.${element.kind}.${element.index}` });
     });
-    return { elements };
+    return {
+      elements,
+      blocks: Array.isArray(content?.blocks) ? clone(content.blocks) : [],
+      sectionOrder: Array.isArray(content?.sectionOrder) ? content.sectionOrder.slice() : [],
+      hiddenSections: Array.isArray(content?.hiddenSections) ? content.hiddenSections.slice() : []
+    };
   }
 
   function genericState(slug = activePage) { return genericStates[slug]; }
-  function genericContent(slug = activePage) { return genericState(slug)?.draftByLanguage?.[language] || { elements: [] }; }
-  function genericPublished(slug = activePage) { return genericState(slug)?.publishedByLanguage?.[language] || { elements: [] }; }
+  function genericContent(slug = activePage) { return genericState(slug)?.draftByLanguage?.[language] || { elements: [], blocks: [] }; }
+  function genericPublished(slug = activePage) { return genericState(slug)?.publishedByLanguage?.[language] || { elements: [], blocks: [] }; }
 
   async function applyGenericRemotePage(slug, data) {
     const html = await fetch(`/${pageMeta[slug].file}`, { cache: 'no-store' }).then((response) => response.text());
@@ -430,12 +476,48 @@
       revisions: (data.revisions || []).map((revision) => ({ id: revision.id, createdAt: revision.created_at, version: revision.version, language: revision.language })),
       lastUpdated: data.draft?.[language]?.updated_at || data.published?.[language]?.updated_at || null
     };
-    activeSection = genericContent(slug).elements[0]?.group || 'content';
+    const firstBlock = genericContent(slug).blocks?.[0];
+    activeSection = genericContent(slug).elements[0]?.group || (firstBlock ? `block:${firstBlock.id}` : 'content');
   }
 
   function currentDraft() { return activePage === 'home' ? state.draft : genericContent(); }
   function currentPublished() { return activePage === 'home' ? state.published : genericPublished(); }
   function currentRevisions() { return activePage === 'home' ? state.revisions : (genericState()?.revisions || []); }
+
+  function currentPageContent() { return currentDraft(); }
+  function hiddenSections(content = currentPageContent()) {
+    if (!content || typeof content !== 'object') return [];
+    if (!Array.isArray(content.hiddenSections)) content.hiddenSections = [];
+    return content.hiddenSections;
+  }
+  function sectionIsHidden(id, content = currentPageContent()) { return hiddenSections(content).includes(id); }
+  function dynamicBlocks(content = currentPageContent()) {
+    if (!content || typeof content !== 'object') return [];
+    if (!Array.isArray(content.blocks)) content.blocks = [];
+    return content.blocks;
+  }
+  function dynamicBlockForSection(section = activeSection, content = currentPageContent()) {
+    if (!String(section).startsWith('block:')) return null;
+    return dynamicBlocks(content).find((block) => `block:${block.id}` === section) || null;
+  }
+  function contentForSection(section = activeSection) {
+    if (section === '__new-content__') return addContentDraft?.block || {};
+    const dynamic = dynamicBlockForSection(section);
+    if (dynamic) return dynamic;
+    return activePage === 'home' ? state.draft[section] : genericContent();
+  }
+  function blockCopyForEditor(block, code = language) {
+    if (!block[code] || typeof block[code] !== 'object') block[code] = {};
+    return block[code];
+  }
+  function sectionIsDirty(id) {
+    if (String(id).startsWith('block:')) {
+      const draftBlock = dynamicBlockForSection(id, currentDraft());
+      const publishedBlock = dynamicBlockForSection(id, currentPublished());
+      return JSON.stringify(normalizeMediaForCompare(draftBlock)) !== JSON.stringify(normalizeMediaForCompare(publishedBlock));
+    }
+    return JSON.stringify(normalizeMediaForCompare(state.draft[id])) !== JSON.stringify(normalizeMediaForCompare(state.published[id]));
+  }
 
   function pageIsDirty() { return JSON.stringify(normalizeMediaForCompare(currentDraft())) !== JSON.stringify(normalizeMediaForCompare(currentPublished())); }
 
@@ -520,13 +602,13 @@
   function mediaPicker(label, path, value, options = {}) {
     const safeValue = value || '';
     const name = state.media.find((item) => item.src === safeValue)?.name || safeValue.split('/').pop() || 'No image selected';
-    const position = options.positionPath ? getAt(state.draft[activeSection], options.positionPath) || 'center' : null;
-    return `<div class="field-group"><label>${label}</label><div class="media-picker"><img src="${assetUrl(safeValue)}" alt="" style="object-position:${position || 'center'}" /><div class="media-picker-info"><strong>${escapeHtml(name)}</strong><small>Click to replace or reposition</small><button type="button" data-action="media" data-path="${path}">Change image</button></div></div>${options.positionPath ? selectField('Image position', options.positionPath, position, { choices: ['center', 'top', 'bottom', 'left', 'right'] }) : ''}</div>`;
+    const section = options.section || activeSection;
+    const position = options.positionPath ? getAt(contentForSection(section), options.positionPath) || 'center' : null;
+    return `<div class="field-group"><label>${label}</label><div class="media-picker"><img src="${assetUrl(safeValue)}" alt="" style="object-position:${position || 'center'}" /><div class="media-picker-info"><strong>${escapeHtml(name)}</strong><small>Click to replace or reposition</small><button type="button" data-action="media" data-section="${escapeHtml(section)}" data-path="${path}">Change image</button></div></div>${options.positionPath ? selectField('Image position', options.positionPath, position, { choices: ['center', 'top', 'bottom', 'left', 'right'] }) : ''}</div>`;
   }
 
-  function updateMediaPicker(path, src) {
-    const form = $('#section-form');
-    const button = [...(form?.querySelectorAll('[data-action="media"]') || [])].find((item) => item.dataset.path === path);
+  function updateMediaPicker(path, src, section = null) {
+    const button = [...document.querySelectorAll('[data-action="media"]')].find((item) => item.dataset.path === path && (!section || item.dataset.section === section));
     const picker = button?.closest('.media-picker');
     if (!picker) return;
     const image = picker.querySelector('img');
@@ -594,18 +676,282 @@
     return `${field('Brand name', `${language}.brand`, copy.brand)}${field('Description', `${language}.description`, copy.description, { textarea: true })}${field('Contact heading', `${language}.contactHeading`, copy.contactHeading)}${field('Phone line', `${language}.phone`, copy.phone)}${field('Email', `${language}.email`, copy.email)}${field('Address', `${language}.address`, copy.address, { textarea: true })}${field('Payment heading', `${language}.paymentHeading`, copy.paymentHeading)}${field('M-Pesa line', `${language}.mpesa`, copy.mpesa)}${field('CRDB line', `${language}.crdb`, copy.crdb)}${field('Cash line', `${language}.cash`, copy.cash)}${field('Social heading', `${language}.socialHeading`, copy.socialHeading)}${field('Social line one', `${language}.socialOne`, copy.socialOne)}${field('Social line two', `${language}.socialTwo`, copy.socialTwo)}`;
   }
 
+  function newBlockId(prefix = 'block') {
+    const used = new Set(dynamicBlocks().map((block) => block.id));
+    let id = `${prefix}-${Date.now().toString(36)}`;
+    let suffix = 1;
+    while (used.has(id)) id = `${prefix}-${Date.now().toString(36)}-${suffix++}`;
+    return id;
+  }
+
+  function newBlockCopy(label = 'New content section') {
+    return { heading: label, subheading: '', title: label, description: '', buttonLabel: '', buttonLink: '', alt: '', caption: '' };
+  }
+
+  function newCard(id) {
+    const image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png';
+    return { id, image, position: 'center', en: { title: 'New card', description: '', alt: 'EcoPower content' }, sw: { title: 'Kadi mpya', description: '', alt: 'Maudhui ya EcoPower' } };
+  }
+
+  function newGalleryImage(id) {
+    const image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png';
+    return { id, image, position: 'center', en: { caption: '', alt: 'EcoPower content' }, sw: { caption: '', alt: 'Maudhui ya EcoPower' } };
+  }
+
+  function newDynamicBlock(type) {
+    const block = { id: newBlockId(type), type, visible: true, en: newBlockCopy(), sw: newBlockCopy('Sehemu mpya ya maudhui') };
+    if (type === 'image' || type === 'imageText') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png'; block.position = 'center'; }
+    if (type === 'imageText') block.layout = 'left';
+    if (type === 'cards') block.cards = [newCard(`${block.id}-card-1`)];
+    if (type === 'gallery') block.images = [newGalleryImage(`${block.id}-image-1`)];
+    return block;
+  }
+
+  function dynamicToolbar(block) {
+    const visibilityLabel = block.visible === false ? 'Show on public page' : 'Hide from public page';
+    return `<div class="dynamic-block-toolbar"><span>${block.visible === false ? 'Hidden draft block' : 'Visible draft block'}</span><div><button type="button" class="section-action" data-action="toggle-block" data-block-id="${escapeHtml(block.id)}">${visibilityLabel}</button><button type="button" class="section-action" data-action="delete-block" data-block-id="${escapeHtml(block.id)}">Delete</button></div></div>`;
+  }
+
+  function renderDynamicCard(block, card, index, sectionKey = activeSection) {
+    const copy = blockCopyForEditor(card);
+    return `<div class="repeat-card dynamic-card-row"><div class="repeat-card-header"><strong>Card ${index + 1}</strong><span><button type="button" class="section-action" data-action="move-card-up" data-block-id="${escapeHtml(block.id)}" data-card-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button><button type="button" class="section-action" data-action="move-card-down" data-block-id="${escapeHtml(block.id)}" data-card-index="${index}" ${index === block.cards.length - 1 ? 'disabled' : ''}>↓</button><button type="button" class="section-action" data-action="remove-card" data-block-id="${escapeHtml(block.id)}" data-card-index="${index}">Remove</button></span></div>${mediaPicker('Card image', `cards.${index}.image`, card.image, { positionPath: `cards.${index}.position` })}${field('Title', `cards.${index}.${language}.title`, copy.title || '')}${field('Description', `cards.${index}.${language}.description`, copy.description || '', { textarea: true })}${field('Alternative text', `cards.${index}.${language}.alt`, copy.alt || '')}</div>`;
+  }
+
+  function renderDynamicGalleryImage(block, item, index, sectionKey = activeSection) {
+    const copy = blockCopyForEditor(item);
+    return `<div class="repeat-card dynamic-card-row"><div class="repeat-card-header"><strong>Gallery image ${index + 1}</strong><span><button type="button" class="section-action" data-action="move-gallery-image" data-block-id="${escapeHtml(block.id)}" data-image-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button><button type="button" class="section-action" data-action="move-gallery-image-down" data-block-id="${escapeHtml(block.id)}" data-image-index="${index}" ${index === block.images.length - 1 ? 'disabled' : ''}>↓</button><button type="button" class="section-action" data-action="remove-gallery-image" data-block-id="${escapeHtml(block.id)}" data-image-index="${index}">Remove</button></span></div>${mediaPicker('Gallery image', `images.${index}.image`, item.image, { positionPath: `images.${index}.position` })}${field('Caption', `images.${index}.${language}.caption`, copy.caption || '')}${field('Alternative text', `images.${index}.${language}.alt`, copy.alt || '')}</div>`;
+  }
+
+  function renderDynamicBlockForm(open = true) {
+    const block = dynamicBlockForSection();
+    if (!block) return;
+    if (block.type === 'cards' && !Array.isArray(block.cards)) block.cards = [];
+    if (block.type === 'gallery' && !Array.isArray(block.images)) block.images = [];
+    const copy = blockCopyForEditor(block);
+    const drawer = $('#editor-drawer');
+    const labels = { text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Card collection', gallery: 'Gallery' };
+    $('#drawer-title').textContent = labels[block.type] || 'Content block';
+    $('#drawer-description').textContent = 'Edit this added section, then save the draft before publishing it.';
+    $('#drawer-language').textContent = language === 'sw' ? 'Kiswahili' : 'English';
+    let html = dynamicToolbar(block);
+    if (block.type === 'text') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'image') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Caption', `${language}.caption`, copy.caption || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'imageText') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${selectField('Image alignment', 'layout', block.layout || 'left', { choices: ['left', 'right'] })}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'cards') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${block.cards.map((card, index) => renderDynamicCard(block, card, index)).join('')}<button type="button" class="admin-button button-outline" data-action="add-card" data-block-id="${escapeHtml(block.id)}">Add card</button>`;
+    if (block.type === 'gallery') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${block.images.map((item, index) => renderDynamicGalleryImage(block, item, index)).join('')}<button type="button" class="admin-button button-outline" data-action="add-gallery-image" data-block-id="${escapeHtml(block.id)}">Add gallery image</button>`;
+    $('#section-form').innerHTML = html;
+    if (open) { drawer.setAttribute('aria-hidden', 'false'); drawer.classList.add('open'); $('#drawer-backdrop').hidden = false; }
+  }
+
+  function pendingMediaPicker(label, path, value, options = {}) {
+    const previousSection = activeSection;
+    activeSection = '__new-content__';
+    const markup = mediaPicker(label, path, value, { ...options, section: '__new-content__' });
+    activeSection = previousSection;
+    return markup;
+  }
+
+  function renderPendingBlockFields(block) {
+    const copy = blockCopyForEditor(block);
+    if (block.type === 'text') return `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'image') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Caption', `${language}.caption`, copy.caption || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'imageText') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${selectField('Image alignment', 'layout', block.layout || 'left', { choices: ['left', 'right'] })}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
+    if (block.type === 'cards') {
+      const previousSection = activeSection;
+      activeSection = '__new-content__';
+      const cards = block.cards.map((card, index) => renderDynamicCard(block, card, index)).join('');
+      activeSection = previousSection;
+      return `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${cards}<button type="button" class="admin-button button-outline" data-action="add-card" data-block-id="${escapeHtml(block.id)}">Add card</button>`;
+    }
+    if (block.type === 'gallery') {
+      const previousSection = activeSection;
+      activeSection = '__new-content__';
+      const images = block.images.map((item, index) => renderDynamicGalleryImage(block, item, index)).join('');
+      activeSection = previousSection;
+      return `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '')}${field('Description', `${language}.description`, copy.description || '', { textarea: true })}${images}<button type="button" class="admin-button button-outline" data-action="add-gallery-image" data-block-id="${escapeHtml(block.id)}">Add gallery image</button>`;
+    }
+    return '';
+  }
+
+  function ensureAddContentPanel() {
+    if ($('#add-content-form-view')) return;
+    const grid = $('.add-content-grid');
+    if (!grid) return;
+    grid.insertAdjacentHTML('afterend', '<section id="add-content-form-view" class="add-content-form-view" hidden><div class="add-content-form-heading"><span class="admin-kicker">CONTENT DETAILS</span><strong id="add-content-type-label"></strong><small>Complete this block, then add it to the selected section draft.</small></div><form id="add-content-form"><div id="add-content-fields"></div><div class="add-content-form-actions"><button type="button" class="admin-button button-quiet" data-action="change-content-type">Change type</button><div><button type="button" class="admin-button button-outline" data-action="close-add-content">Cancel</button><button type="submit" class="admin-button button-green" data-action="commit-add-content">Add to Section</button></div></div></form></section>');
+    $('#add-content-form').addEventListener('input', (event) => {
+      const target = event.target.closest('[data-path]');
+      if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
+    });
+    $('#add-content-form').addEventListener('change', (event) => {
+      const target = event.target.closest('[data-path]');
+      if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
+    });
+    $('#add-content-form').addEventListener('submit', (event) => { event.preventDefault(); void commitAddContent(); });
+  }
+
+  function renderAddContentModalForm() {
+    ensureAddContentPanel();
+    const grid = $('.add-content-grid');
+    const view = $('#add-content-form-view');
+    if (!grid || !view) return;
+    grid.hidden = Boolean(addContentDraft);
+    view.hidden = !addContentDraft;
+    if (!addContentDraft) return;
+    const labels = { text: 'Text, heading and description', image: 'Image with title', imageText: 'Image + text side by side', cards: 'Multiple cards', gallery: 'Image gallery' };
+    $('#add-content-type-label').textContent = labels[addContentDraft.block.type] || 'Content block';
+    $('#add-content-fields').innerHTML = renderPendingBlockFields(addContentDraft.block);
+  }
+
+  function startAddContent(type) {
+    addContentDraft = { section: pendingContentSection, block: newDynamicBlock(type) };
+    renderAddContentModalForm();
+  }
+
+  async function commitAddContent() {
+    if (!addContentDraft) return;
+    const { section, block } = addContentDraft;
+    block.anchor = section || null;
+    block.placement = $('#add-content-placement')?.value || 'inside';
+    dynamicBlocks(currentPageContent()).push(block);
+    activeSection = `block:${block.id}`;
+    addContentDraft = null;
+    closeAddContent();
+    renderSectionList();
+    renderDynamicBlockForm();
+    updatePreview();
+    draftChangeVersion += 1;
+    clearTimeout(draftSaveTimer);
+    const saved = await saveDraftRemote(true);
+    if (saved) showToast('Content added to the selected section draft. Publish when ready.');
+    else showToast('Content was added locally, but the draft could not be saved. Try Save Draft again.');
+  }
+
+  function dynamicBlockRow(block, index) {
+    const copy = blockCopyForEditor(block, language);
+    const label = copy.heading || copy.title || ({ text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Card collection', gallery: 'Gallery' }[block.type] || 'Content block');
+    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Visible'} · ${block.type}</small></div><div class="section-row-actions"><button class="section-action" data-action="edit-section" data-section="block:${escapeHtml(block.id)}">Edit</button><button class="section-action" data-action="move-block-up" data-block-id="${escapeHtml(block.id)}" ${index === 0 ? 'disabled' : ''}>↑</button><button class="section-action" data-action="move-block-down" data-block-id="${escapeHtml(block.id)}" ${index === dynamicBlocks().length - 1 ? 'disabled' : ''}>↓</button></div></div>`;
+  }
+
+  function closeAddContent() { $('#add-content-backdrop').hidden = true; $('#add-content-modal').hidden = true; }
+  function openAddContent() { $('#add-content-backdrop').hidden = false; $('#add-content-modal').hidden = false; }
+  function addDynamicBlock(type) {
+    const block = newDynamicBlock(type);
+    dynamicBlocks().push(block);
+    activeSection = `block:${block.id}`;
+    closeAddContent();
+    renderSectionList();
+    renderDynamicBlockForm();
+    persistDraft(false);
+  }
+  function moveDynamicBlock(id, delta) {
+    const blocks = dynamicBlocks();
+    const index = blocks.findIndex((block) => block.id === id);
+    const next = index + delta;
+    if (index < 0 || next < 0 || next >= blocks.length) return;
+    [blocks[index], blocks[next]] = [blocks[next], blocks[index]];
+    renderSectionList();
+    persistDraft(false);
+  }
+  function toggleDynamicBlock(id) { const block = dynamicBlocks().find((item) => item.id === id); if (!block) return; block.visible = block.visible === false; renderSectionList(); renderDynamicBlockForm(false); persistDraft(false); }
+  function deleteDynamicBlock(id) {
+    if (!window.confirm('Delete this draft content block? It will disappear from the public page after you publish.')) return;
+    const blocks = dynamicBlocks();
+    const index = blocks.findIndex((block) => block.id === id);
+    if (index < 0) return;
+    blocks.splice(index, 1);
+    activeSection = activePage === 'home' ? 'hero' : (genericContent().elements[0]?.group || 'content');
+    renderSectionList();
+    renderForm(false);
+    persistDraft(false);
+  }
+  function moveNested(items, index, delta) { const next = index + delta; if (!Array.isArray(items) || index < 0 || next < 0 || next >= items.length) return; [items[index], items[next]] = [items[next], items[index]]; }
+
+  function sectionActionButtons(id, isDynamic = false) {
+    const hidden = isDynamic ? dynamicBlockForSection(id)?.visible === false : sectionIsHidden(id);
+    const actualIndex = isDynamic ? dynamicBlocks().findIndex((block) => `block:${block.id}` === id) : -1;
+    const overflowActions = `<button class="section-overflow-item" data-action="move-section-up" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex <= 0 ? 'disabled' : ''}>Move up</button><button class="section-overflow-item" data-action="move-section-down" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex === dynamicBlocks().length - 1 ? 'disabled' : ''}>Move down</button><button class="section-overflow-item" data-action="toggle-section" data-section="${escapeHtml(id)}">${hidden ? 'Show section' : 'Hide section'}</button>${isDynamic ? `<button class="section-overflow-item danger" data-action="delete-block" data-block-id="${escapeHtml(id.slice(6))}">Delete</button>` : ''}`;
+    return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button><button class="section-action add-content-action" data-action="open-add-content" data-section="${escapeHtml(id)}">Add Content</button><div class="section-overflow-wrap"><button class="section-action section-overflow-button" data-action="toggle-section-menu" aria-expanded="false" aria-label="More section actions">•••</button><div class="section-overflow-menu" hidden>${overflowActions}</div></div></div>`;
+    return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit Content</button><button class="section-action" data-action="open-add-content" data-section="${escapeHtml(id)}">Add Content</button><button class="section-action" data-action="quick-add-block" data-section="${escapeHtml(id)}" data-block-type="image">Add Image</button><button class="section-action" data-action="quick-add-block" data-section="${escapeHtml(id)}" data-block-type="text">Add Description</button><button class="section-action" data-action="move-section-up" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex <= 0 ? 'disabled' : ''}>↑</button><button class="section-action" data-action="move-section-down" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex === dynamicBlocks().length - 1 ? 'disabled' : ''}>↓</button><button class="section-action" data-action="toggle-section" data-section="${escapeHtml(id)}">${hidden ? 'Show' : 'Hide'}</button>${isDynamic ? `<button class="section-action" data-action="delete-block" data-block-id="${escapeHtml(id.slice(6))}">Delete</button>` : ''}</div>`;
+  }
+
+  function staticSectionRow(id, label, description, index) {
+    const hidden = sectionIsHidden(id);
+    const dirty = activePage === 'home' ? sectionIsDirty(id) : pageIsDirty();
+    return `<div class="section-row ${id === activeSection ? 'active' : ''} ${hidden ? 'is-hidden' : ''}" data-section="${escapeHtml(id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${dirty ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${hidden ? 'Hidden on the public page' : escapeHtml(description)}</small></div>${sectionActionButtons(id)}</div>`;
+  }
+
+  function dynamicBlockRow(block, index) {
+    const copy = blockCopyForEditor(block, language);
+    const actualIndex = dynamicBlocks().indexOf(block);
+    const label = copy.heading || copy.title || ({ text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Card collection', gallery: 'Gallery' }[block.type] || 'Content block');
+    const placement = block.anchor ? `${block.placement || 'after'} · ${block.anchor.replace(/^block:/, '')}` : 'End of page';
+    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Visible'} · ${block.type} · ${escapeHtml(placement)}</small></div>${sectionActionButtons(`block:${block.id}`, true)}</div>`;
+  }
+
+  function orderedSectionRows(entries, content) {
+    if (Array.isArray(content?.sectionOrder) && content.sectionOrder.length) {
+      const byId = new Map(entries.map((entry) => [entry.id, entry]));
+      const ordered = content.sectionOrder.map((id) => byId.get(id)).filter(Boolean);
+      entries = ordered.concat(entries.filter((entry) => !content.sectionOrder.includes(entry.id)));
+    }
+    const blocks = dynamicBlocks(content);
+    const used = new Set();
+    let displayIndex = 0;
+    const children = (anchor, placement) => blocks.filter((block) => !used.has(block) && block.anchor === anchor && (block.placement || 'after') === placement);
+    const emitBlock = (block) => {
+      if (!block || used.has(block)) return '';
+      used.add(block);
+      const row = dynamicBlockRow(block, displayIndex++);
+      const nested = blocks.filter((child) => !used.has(child) && child.anchor === `block:${block.id}`).map((child) => emitBlock(child)).join('');
+      return row + nested;
+    };
+    const output = entries.map((entry) => {
+      const before = children(entry.id, 'before').map((block) => emitBlock(block)).join('');
+      const row = staticSectionRow(entry.id, entry.label, entry.description, displayIndex++);
+      const after = children(entry.id, 'inside').concat(children(entry.id, 'after')).map((block) => emitBlock(block)).join('');
+      return before + row + after;
+    }).join('');
+    return output + blocks.filter((block) => !used.has(block)).map((block) => emitBlock(block)).join('');
+  }
+
+  function closeAddContent() {
+    $('#add-content-backdrop').hidden = true;
+    $('#add-content-modal').hidden = true;
+    addContentDraft = null;
+    const grid = $('.add-content-grid');
+    const view = $('#add-content-form-view');
+    if (grid) grid.hidden = false;
+    if (view) view.hidden = true;
+  }
+  function openAddContent(section = activeSection) {
+    ensureAddContentPanel();
+    pendingContentSection = section || activeSection;
+    addContentDraft = null;
+    const context = $('#add-content-context');
+    const label = pendingContentSection.startsWith('block:') ? 'the selected content block' : (sectionMeta.find(([id]) => id === pendingContentSection)?.[1] || genericContent().elements.find((element) => (element.group || 'content') === pendingContentSection)?.groupLabel || 'the selected section');
+    if (context) context.textContent = `New content will be attached to ${label}. Choose a block type, complete its details, then add it to this section.`;
+    const placement = $('#add-content-placement');
+    if (placement) placement.value = 'inside';
+    renderAddContentModalForm();
+    $('#add-content-backdrop').hidden = false;
+    $('#add-content-modal').hidden = false;
+  }
+
   function renderGenericSectionList() {
     const content = genericContent();
     const groups = [...new Map(content.elements.map((element) => [element.group || 'content', { id: element.group || 'content', label: element.groupLabel || 'Page content' }])).values()];
-    $('#section-count').textContent = `${groups.length} page sections`;
-    $('#section-list').innerHTML = groups.map((group, index) => {
+    const blocks = dynamicBlocks(content);
+    $('#section-count').textContent = `${groups.length + blocks.length} page sections`;
+    const groupRows = groups.map((group, index) => {
       const items = content.elements.filter((element) => (element.group || 'content') === group.id);
       const imageCount = items.filter((element) => element.kind === 'image').length;
       return `<div class="section-row ${group.id === activeSection ? 'active' : ''}" data-section="${escapeHtml(group.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(group.label)}${pageIsDirty() ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${items.length} editable fields${imageCount ? ` · ${imageCount} image${imageCount > 1 ? 's' : ''}` : ''}</small></div><button class="section-action" data-action="edit-section" data-section="${escapeHtml(group.id)}">Edit</button></div>`;
     }).join('');
+    $('#section-list').innerHTML = groupRows + blocks.map((block, index) => dynamicBlockRow(block, index + groups.length)).join('');
   }
 
   function renderGenericForm(open = true) {
+    if (activeSection.startsWith('block:')) return renderDynamicBlockForm(open);
     const content = genericContent();
     const elements = content.elements.filter((element) => (element.group || 'content') === activeSection);
     const group = elements[0]?.groupLabel || 'Page content';
@@ -627,6 +973,7 @@
 
   function renderForm(open = true) {
     if (activePage !== 'home') return renderGenericForm(open);
+    if (activeSection.startsWith('block:')) return renderDynamicBlockForm(open);
     const meta = sectionMeta.find(([id]) => id === activeSection);
     const drawer = $('#editor-drawer');
     $('#drawer-title').textContent = meta[1];
@@ -644,8 +991,24 @@
 
   function renderSectionList() {
     if (activePage !== 'home') return renderGenericSectionList();
-    $('#section-count').textContent = `${sectionMeta.length} sections`;
-    $('#section-list').innerHTML = sectionMeta.map(([id, label, description, hasImage], index) => `<div class="section-row ${id === activeSection ? 'active' : ''}" data-section="${id}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${label}${sectionIsDirty(id) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${description}</small></div><button class="section-action" data-action="edit-section" data-section="${id}">Edit</button></div>`).join('');
+    const blocks = dynamicBlocks(state.draft);
+    $('#section-count').textContent = `${sectionMeta.length + blocks.length} sections`;
+    $('#section-list').innerHTML = sectionMeta.map(([id, label, description], index) => `<div class="section-row ${id === activeSection ? 'active' : ''}" data-section="${id}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${label}${sectionIsDirty(id) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${description}</small></div><button class="section-action" data-action="edit-section" data-section="${id}">Edit</button></div>`).join('') + blocks.map((block, index) => dynamicBlockRow(block, index + sectionMeta.length)).join('');
+  }
+
+  function renderGenericSectionList() {
+    const content = genericContent();
+    const groups = [...new Map(content.elements.map((element) => [element.group || 'content', { id: element.group || 'content', label: element.groupLabel || 'Page content' }])).values()];
+    const rows = orderedSectionRows(groups.map((group) => ({ id: group.id, label: group.label, description: `${content.elements.filter((element) => (element.group || 'content') === group.id).length} editable fields` })), content);
+    $('#section-count').textContent = `${groups.length + dynamicBlocks(content).length} page sections`;
+    $('#section-list').innerHTML = rows;
+  }
+
+  function renderSectionList() {
+    if (activePage !== 'home') return renderGenericSectionList();
+    const rows = orderedSectionRows(sectionMeta.map(([id, label, description]) => ({ id, label, description })), state.draft);
+    $('#section-count').textContent = `${sectionMeta.length + dynamicBlocks(state.draft).length} sections`;
+    $('#section-list').innerHTML = rows;
   }
 
   function sendPreview() {
@@ -661,6 +1024,7 @@
     // Keep image rendering deterministic even while the iframe's own script
     // is booting or waiting on its private API request.
     applyPreviewImages(content);
+    highlightPreviewSection();
     // Re-apply after the embedded page finishes its own CMS boot sequence.
     // This keeps the dashboard's selected draft image authoritative.
     [120, 500, 1200].forEach((delay) => setTimeout(() => {
@@ -668,7 +1032,8 @@
       if (!currentFrame?.contentWindow) return;
       const latest = previewMode === 'published' ? currentPublished() : currentDraft();
       if (typeof currentFrame.contentWindow.__ecopowerApplyPreview === 'function') currentFrame.contentWindow.__ecopowerApplyPreview(latest, language, previewVersion());
-      applyPreviewImages(latest);
+       applyPreviewImages(latest);
+       highlightPreviewSection();
     }, delay));
     $('#preview-caption').textContent = `${previewModeLabel()} · ${language === 'sw' ? 'Kiswahili' : 'English'} · ${document.querySelector('.preview-size.active')?.textContent || 'Desktop'}`;
   }
@@ -697,6 +1062,14 @@
   }
 
   function updatePreview() { sendPreview(); }
+  function highlightPreviewSection() {
+    const doc = $('#preview-frame')?.contentDocument;
+    if (!doc) return;
+    doc.querySelectorAll('.cms-admin-selected-section').forEach((element) => element.classList.remove('cms-admin-selected-section'));
+    const key = activeSection.startsWith('block:') ? activeSection.slice(6) : activeSection;
+    const match = [...doc.querySelectorAll('[data-cms-section]')].find((element) => element.dataset.cmsSection === key);
+    if (match) match.classList.add('cms-admin-selected-section');
+  }
 
   function closeDrawer() {
     $('#editor-drawer').classList.remove('open');
@@ -806,25 +1179,54 @@
     updatePreview();
   }
 
+  function moveSection(id, delta) {
+    if (String(id).startsWith('block:')) return moveDynamicBlock(id.slice(6), delta);
+    const content = currentPageContent();
+    const entries = activePage === 'home' ? sectionMeta.map(([sectionId]) => sectionId) : [...new Set(content.elements.map((element) => element.group || 'content'))];
+    const order = Array.isArray(content.sectionOrder) && content.sectionOrder.length ? content.sectionOrder.slice() : entries.slice();
+    const index = order.indexOf(id);
+    const next = index + delta;
+    if (index < 0 || next < 0 || next >= order.length) return;
+    [order[index], order[next]] = [order[next], order[index]];
+    content.sectionOrder = order;
+    renderSectionList();
+    persistDraft(false);
+  }
+  function toggleSection(id) {
+    if (String(id).startsWith('block:')) return toggleDynamicBlock(id.slice(6));
+    const content = currentPageContent();
+    const hidden = hiddenSections(content);
+    const index = hidden.indexOf(id);
+    if (index >= 0) hidden.splice(index, 1); else hidden.push(id);
+    renderSectionList();
+    renderForm(false);
+    persistDraft(false);
+  }
+
   $('#section-list').addEventListener('click', (event) => {
+    if (event.target.closest('[data-action]')) return;
     const row = event.target.closest('[data-section]');
     if (!row) return;
     activeSection = row.dataset.section;
     renderSectionList();
     renderForm();
+    updatePreview();
   });
 
   $('#section-form').addEventListener('input', (event) => {
     const target = event.target.closest('[data-path]');
     if (!target) return;
-    const draft = activePage === 'home' ? state.draft[activeSection] : genericContent();
+    const draft = contentForSection(activeSection);
     setAt(draft, target.dataset.path, target.value);
     persistDraft(false);
   });
 
   document.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action], [data-page], [data-toast]');
-    if (!target) return;
+    if (!target) {
+      document.querySelectorAll('.section-overflow-menu:not([hidden])').forEach((menu) => { menu.hidden = true; });
+      return;
+    }
     if (target.dataset.page) {
       switchPage(target.dataset.page, target);
       return;
@@ -834,6 +1236,8 @@
       return;
     }
     const action = target.dataset.action;
+    if (action === 'dashboard') { showDashboard(); return; }
+    if (action === 'open-pages') { showPageEditor(); renderSectionList(); renderForm(false); return; }
     if (action === 'logout') {
       apiRequest('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }).catch(() => {}).finally(() => showLogin('You have been signed out.'));
       return;
@@ -842,6 +1246,61 @@
     if (action === 'settings') { openSettings(); return; }
     if (action === 'close-messages') { closeMessages(); return; }
     if (action === 'close-settings') { closeSettings(); return; }
+    if (action === 'open-add-content') { openAddContent(target.dataset.section || activeSection); return; }
+    if (action === 'quick-add-block') { openAddContent(target.dataset.section || activeSection); return; }
+    if (action === 'toggle-section-menu') {
+      const row = target.closest('.section-row');
+      const menu = row?.querySelector('.section-overflow-menu');
+      document.querySelectorAll('.section-overflow-menu:not([hidden])').forEach((item) => { if (item !== menu) item.hidden = true; });
+      if (menu) { menu.hidden = !menu.hidden; target.setAttribute('aria-expanded', String(!menu.hidden)); }
+      return;
+    }
+    if (action === 'change-content-type') { addContentDraft = null; renderAddContentModalForm(); return; }
+    if (action === 'move-section-up') { moveSection(target.dataset.section, -1); return; }
+    if (action === 'move-section-down') { moveSection(target.dataset.section, 1); return; }
+    if (action === 'toggle-section') { toggleSection(target.dataset.section); return; }
+    if (action === 'close-add-content') { closeAddContent(); return; }
+    if (action === 'add-block') { startAddContent(target.dataset.blockType); return; }
+    if (action === 'move-block-up') { moveDynamicBlock(target.dataset.blockId, -1); return; }
+    if (action === 'move-block-down') { moveDynamicBlock(target.dataset.blockId, 1); return; }
+    if (action === 'toggle-block') { toggleDynamicBlock(target.dataset.blockId); return; }
+    if (action === 'delete-block') { deleteDynamicBlock(target.dataset.blockId); return; }
+    if (action === 'add-card') {
+      const pending = addContentDraft?.block?.id === target.dataset.blockId ? addContentDraft.block : null;
+      const block = pending || dynamicBlocks().find((item) => item.id === target.dataset.blockId);
+      if (block) { block.cards.push(newCard(`${block.id}-card-${block.cards.length + 1}`)); pending ? renderAddContentModalForm() : (renderDynamicBlockForm(false), persistDraft(false)); }
+      return;
+    }
+    if (action === 'remove-card' || action === 'move-card-up' || action === 'move-card-down') {
+      const pending = addContentDraft?.block?.id === target.dataset.blockId ? addContentDraft.block : null;
+      const block = pending || dynamicBlocks().find((item) => item.id === target.dataset.blockId);
+      const index = Number(target.dataset.cardIndex);
+      if (block && Array.isArray(block.cards)) {
+        if (action === 'remove-card') block.cards.splice(index, 1);
+        else moveNested(block.cards, index, action === 'move-card-up' ? -1 : 1);
+        if (pending) renderAddContentModalForm();
+        else { renderDynamicBlockForm(false); persistDraft(false); }
+      }
+      return;
+    }
+    if (action === 'add-gallery-image') {
+      const pending = addContentDraft?.block?.id === target.dataset.blockId ? addContentDraft.block : null;
+      const block = pending || dynamicBlocks().find((item) => item.id === target.dataset.blockId);
+      if (block) { block.images.push(newGalleryImage(`${block.id}-image-${block.images.length + 1}`)); pending ? renderAddContentModalForm() : (renderDynamicBlockForm(false), persistDraft(false)); }
+      return;
+    }
+    if (action === 'remove-gallery-image' || action === 'move-gallery-image' || action === 'move-gallery-image-down') {
+      const pending = addContentDraft?.block?.id === target.dataset.blockId ? addContentDraft.block : null;
+      const block = pending || dynamicBlocks().find((item) => item.id === target.dataset.blockId);
+      const index = Number(target.dataset.imageIndex);
+      if (block && Array.isArray(block.images)) {
+        if (action === 'remove-gallery-image') block.images.splice(index, 1);
+        else moveNested(block.images, index, action === 'move-gallery-image' ? -1 : 1);
+        if (pending) renderAddContentModalForm();
+        else { renderDynamicBlockForm(false); persistDraft(false); }
+      }
+      return;
+    }
     if (action === 'mark-message') { apiRequest(`/api/messages/${target.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'handled' }) }).then(openMessages).catch((error) => showToast(error.message)); return; }
     if (action === 'toggle-pages') {
       const pageList = $('#page-nav-list');
@@ -852,21 +1311,22 @@
       if (chevron) chevron.textContent = isOpen ? '⌄' : '⌃';
       return;
     }
-    if (action === 'edit-section') { activeSection = target.dataset.section; renderSectionList(); renderForm(); }
+    if (action === 'edit-section') { activeSection = target.dataset.section; showPageEditor(); renderSectionList(); renderForm(); updatePreview(); }
     if (action === 'save-draft') saveDraft();
     if (action === 'publish') publish();
     if (action === 'close-drawer') closeDrawer();
     if (action === 'drawer-media') { if (activePage === 'home') openMedia(activeSection, 'image'); else showToast('Select an image field below to choose the replacement.'); }
-    if (action === 'media') openMedia(activeSection, target.dataset.path);
+    if (action === 'media') openMedia(target.dataset.section || activeSection, target.dataset.path);
     if (action === 'close-media') closeMedia();
     if (action === 'select-media' && mediaTarget) {
       const targetSection = mediaTarget.section;
       const targetPath = mediaTarget.path;
       const selectedSrc = target.dataset.src;
-      setAt(activePage === 'home' ? state.draft[targetSection] : genericContent(), targetPath, selectedSrc);
+      setAt(contentForSection(targetSection), targetPath, selectedSrc);
       draftChangeVersion += 1;
       closeMedia();
-      updateMediaPicker(targetPath, selectedSrc);
+      updateMediaPicker(targetPath, selectedSrc, targetSection);
+      if (targetSection === '__new-content__') { renderAddContentModalForm(); showToast('Image selected for the new content block.'); return; }
       updatePreview();
       // Image selection is a content change. Persist it immediately so a
       // page switch, refresh, or publish cannot race the debounced text save.
@@ -917,10 +1377,15 @@
   async function assignUploadedMedia(uploaded, targetSection, targetPath, successMessage) {
     const item = { ...uploaded, name: uploaded.original_name, uploaded: true };
     state.media.unshift(item);
-    setAt(activePage === 'home' ? state.draft[targetSection] : genericContent(), targetPath, item.src);
+    setAt(contentForSection(targetSection), targetPath, item.src);
     draftChangeVersion += 1;
     closeMedia();
-    updateMediaPicker(targetPath, item.src);
+    updateMediaPicker(targetPath, item.src, targetSection);
+    if (targetSection === '__new-content__') {
+      renderAddContentModalForm();
+      showToast('Image uploaded and attached to the new content block.');
+      return;
+    }
     updatePreview();
     const saved = await saveDraftRemote(true);
     if (saved) showToast(successMessage);
@@ -929,7 +1394,7 @@
   $('#media-upload').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
     if (!file || !mediaTarget) return;
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) { showToast('Please upload a JPEG, PNG, WebP or AVIF image.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)) { showToast('Please upload a JPEG, PNG, WebP, AVIF or GIF image.'); return; }
     if (file.size > 10 * 1024 * 1024) { showToast('Image must be smaller than 10 MB.'); return; }
     const targetSection = mediaTarget.section;
     const targetPath = mediaTarget.path;
@@ -967,6 +1432,7 @@
       const result = await apiRequest('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: $('#login-email').value, password: $('#login-password').value }) });
       setAuthenticatedUser(result.user);
       await loadRemoteState();
+      showDashboard();
     } catch (error) {
       showLogin(error.message);
     } finally {
@@ -989,6 +1455,7 @@
       const result = await apiRequest('/api/auth/me');
       setAuthenticatedUser(result.user);
       await loadRemoteState();
+      showDashboard();
     } catch (error) {
       if (/not authenticated|authentication required|session/i.test(error.message)) showLogin();
       else showLogin(`Could not connect to the CMS backend: ${error.message}`);

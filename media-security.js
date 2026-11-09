@@ -8,12 +8,13 @@ const { imageSize } = require('image-size');
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const REMOTE_FETCH_TIMEOUT_MS = 6000;
 const MAX_REMOTE_REDIRECTS = 3;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
 const IMAGE_EXTENSIONS = new Map([
   ['image/jpeg', '.jpg'],
   ['image/png', '.png'],
   ['image/webp', '.webp'],
-  ['image/avif', '.avif']
+  ['image/avif', '.avif'],
+  ['image/gif', '.gif']
 ]);
 
 function normalizeHostname(hostname) {
@@ -27,7 +28,7 @@ function isPrivateIpv4(address) {
   return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 0 && c === 0) || (a === 192 && b === 0 && c === 2) ||
-    (a === 192 && b === 88 && c === 99) || (a === 198 && b >= 18 && b <= 19) ||
+    (a === 192 && b === 88 && c === 99) || (a === 192 && b === 168) || (a === 198 && b >= 18 && b <= 19) ||
     (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113) ||
     a >= 224;
 }
@@ -52,7 +53,7 @@ function assertSafeRemoteUrl(value) {
   if (!hostname || url.username || url.password) throw new Error('The image URL must not contain credentials.');
   if (url.port && url.port !== '443') throw new Error('External image URLs may only use the HTTPS port.');
   const extension = url.pathname.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
-  if (extension && !new Set(['jpg', 'jpeg', 'png', 'webp', 'avif']).has(extension)) throw new Error('The URL does not point to a supported image type.');
+  if (extension && !new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']).has(extension)) throw new Error('The URL does not point to a supported image type.');
   if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local') || hostname.endsWith('.internal') || hostname.endsWith('.home.arpa') || hostname === 'metadata.google.internal') throw new Error('Private-network image URLs are not allowed.');
   if (net.isIP(hostname) && isPrivateAddress(hostname)) throw new Error('Private-network image URLs are not allowed.');
   return url;
@@ -74,6 +75,7 @@ function detectedImageMime(buffer) {
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
   if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
   if (buffer.subarray(4, 8).toString('ascii') === 'ftyp' && /^(?:avif|avis|mif1)$/i.test(buffer.subarray(8, 12).toString('ascii'))) return 'image/avif';
+  if (/^GIF8[79]a$/i.test(buffer.subarray(0, 6).toString('ascii'))) return 'image/gif';
   return null;
 }
 
@@ -81,7 +83,7 @@ function inspectImageBuffer(buffer, declaredMime = '') {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('The image is empty.');
   if (buffer.length > MAX_IMAGE_SIZE) throw new Error(`Images must be smaller than ${Math.round(MAX_IMAGE_SIZE / 1024 / 1024)} MB.`);
   const actualMime = detectedImageMime(buffer);
-  if (!actualMime || !ALLOWED_IMAGE_TYPES.has(actualMime)) throw new Error('The file is not a supported JPEG, PNG, WebP or AVIF image.');
+  if (!actualMime || !ALLOWED_IMAGE_TYPES.has(actualMime)) throw new Error('The file is not a supported JPEG, PNG, WebP, AVIF or GIF image.');
   const normalizedDeclared = String(declaredMime || '').split(';', 1)[0].trim().toLowerCase();
   if (normalizedDeclared && normalizedDeclared !== 'application/octet-stream' && normalizedDeclared !== actualMime) throw new Error('The declared image type does not match the file contents.');
   let dimensions;
@@ -113,7 +115,7 @@ async function fetchRemoteImage(value) {
       response = await fetch(current, {
         redirect: 'manual',
         signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS),
-        headers: { accept: 'image/jpeg,image/png,image/webp,image/avif;q=0.9' }
+        headers: { accept: 'image/jpeg,image/png,image/webp,image/avif,image/gif;q=0.9' }
       });
     } catch (error) {
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new Error('The external image request timed out.');
@@ -143,7 +145,7 @@ function validateImageReference(value) {
     try { assertSafeRemoteUrl(value); } catch (error) { return error.message; }
     return null;
   }
-  if (/^data:/i.test(value) && !/^data:image\/(?:jpeg|png|webp|avif);base64,[a-z0-9+/=]+$/i.test(value)) return 'Only supported base64 image data is allowed.';
+  if (/^data:/i.test(value) && !/^data:image\/(?:jpeg|png|webp|avif|gif);base64,[a-z0-9+/=]+$/i.test(value)) return 'Only supported base64 image data is allowed.';
   if (/^javascript:|^vbscript:|^file:|^ftp:/i.test(value)) return 'Unsafe image URL protocol.';
   return null;
 }

@@ -470,6 +470,90 @@ const cmsImageList = (selector, records = []) => records.forEach((record, index)
   if (copy.alt !== undefined) image.alt = copy.alt;
   if (record.position) image.style.objectPosition = record.position;
 });
+const cmsBlockCopy = (block, language) => block?.[language] || block?.en || block?.sw || {};
+const cmsSafeHref = (value = '') => {
+  const href = String(value || '').trim();
+  if (/^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i.test(href)) return href;
+  return '#';
+};
+const cmsBlockButton = (copy) => copy?.buttonLabel ? `<a class="button button-green" href="${cmsEscape(cmsSafeHref(copy.buttonLink))}">${cmsEscape(copy.buttonLabel)}</a>` : '';
+const cmsBlockImage = (value, copy, className = '', position = 'center') => {
+  const safePosition = ['center', 'top', 'bottom', 'left', 'right'].includes(position) ? position : 'center';
+  return value ? `<img class="${className}" data-cms-image-ref="${cmsEscape(value)}" src="${cmsEscape(cmsAssetUrl(value))}" alt="${cmsEscape(copy?.alt || copy?.title || '')}" loading="lazy" style="object-position:${safePosition}" />` : '';
+};
+const cmsBlockMarkup = (block, language) => {
+  const copy = cmsBlockCopy(block, language);
+  if (block.type === 'text') return `<section class="cms-dynamic-block cms-dynamic-text section section-white"><div class="page-width cms-dynamic-copy">${copy.heading ? `<p class="eyebrow">${cmsEscape(copy.subheading || '')}</p><h2>${cmsEscape(copy.heading)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div></section>`;
+  if (block.type === 'image') return `<section class="cms-dynamic-block cms-dynamic-image section section-cream"><div class="page-width cms-dynamic-image-grid"><figure>${cmsBlockImage(block.image, copy, '', block.position)}${copy.caption ? `<figcaption>${cmsEscape(copy.caption)}</figcaption>` : ''}</figure><div class="cms-dynamic-copy">${copy.title ? `<h2>${cmsEscape(copy.title)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div></div></section>`;
+  if (block.type === 'imageText') {
+    const image = `<div class="cms-dynamic-image-text-media">${cmsBlockImage(block.image, copy, '', block.position)}</div>`;
+    const text = `<div class="cms-dynamic-copy">${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div>`;
+    return `<section class="cms-dynamic-block cms-dynamic-image-text section section-white"><div class="page-width cms-dynamic-image-text-grid layout-${block.layout === 'right' ? 'right' : 'left'}">${block.layout === 'right' ? `${text}${image}` : `${image}${text}`}</div></section>`;
+  }
+  if (block.type === 'cards') return `<section class="cms-dynamic-block cms-dynamic-cards section section-cream"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}</div>${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}</div><div class="cms-dynamic-card-grid">${(block.cards || []).map((card) => { const item = cmsBlockCopy(card, language); return `<article class="cms-dynamic-card">${card.image ? cmsBlockImage(card.image, item, '', card.position) : ''}${item.title ? `<h3>${cmsEscape(item.title)}</h3>` : ''}${item.description ? `<p>${cmsEscape(item.description)}</p>` : ''}</article>`; }).join('')}</div></div></section>`;
+  if (block.type === 'gallery') return `<section class="cms-dynamic-block cms-dynamic-gallery section section-white"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}</div>${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}</div><div class="cms-dynamic-gallery-grid">${(block.images || []).map((item) => { const imageCopy = cmsBlockCopy(item, language); return `<figure>${cmsBlockImage(item.image, imageCopy, '', item.position)}${imageCopy.caption ? `<figcaption>${cmsEscape(imageCopy.caption)}</figcaption>` : ''}</figure>`; }).join('')}</div></div></section>`;
+  return '';
+};
+const cmsHomeSectionSelectors = {
+  hero: '.hero', trust: '.trust-strip', products: '#products', ordering: '#how-it-works',
+  factory: '.story-grid', kitchen: '.kitchen-section', cookstoves: '.stove-showcase',
+  impact: '.home-impact-summary', partners: '.home-partner-section', footer: 'footer'
+};
+const cmsMarkHomeSections = () => {
+  if (document.body.dataset.page !== 'home') return;
+  Object.entries(cmsHomeSectionSelectors).forEach(([key, selector]) => {
+    const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector);
+    if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key;
+  });
+};
+const cmsSectionElement = (anchor) => {
+  if (!anchor) return null;
+  cmsMarkHomeSections();
+  const key = String(anchor).startsWith('block:') ? String(anchor).slice(6) : String(anchor);
+  return [...document.querySelectorAll('[data-cms-section]')].find((element) => element.dataset.cmsSection === key) || null;
+};
+const cmsApplySectionOrder = (content) => {
+  const main = document.querySelector('main');
+  if (!main || !Array.isArray(content?.sectionOrder) || !content.sectionOrder.length) return;
+  let previous = null;
+  content.sectionOrder.forEach((anchor) => {
+    const element = cmsSectionElement(anchor);
+    if (!element || element.parentElement !== main) return;
+    if (previous) previous.after(element); else main.prepend(element);
+    previous = element;
+  });
+};
+const cmsApplySectionVisibility = (content) => {
+  cmsMarkHomeSections();
+  const hidden = new Set(Array.isArray(content?.hiddenSections) ? content.hiddenSections : []);
+  document.querySelectorAll('[data-cms-section]').forEach((element) => element.classList.toggle('cms-section-hidden', hidden.has(element.dataset.cmsSection)));
+};
+const renderCmsBlocks = (blocks = [], language = document.documentElement.lang || 'en') => {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.querySelectorAll('[data-cms-dynamic-container]').forEach((container) => container.remove());
+  const lastAfter = new Map();
+  const lastBefore = new Map();
+  (Array.isArray(blocks) ? blocks : []).filter((block) => block && block.visible !== false).forEach((block) => {
+    const container = document.createElement('div');
+    container.dataset.cmsDynamicContainer = 'true';
+    container.dataset.cmsSection = block.id;
+    container.innerHTML = cmsBlockMarkup(block, language);
+    const anchor = cmsSectionElement(block.anchor);
+    if (!anchor) main.appendChild(container);
+    else if (block.placement === 'inside') anchor.appendChild(container);
+    else if (block.placement === 'before') {
+      const previous = lastBefore.get(anchor) || null;
+      if (previous) previous.after(container); else anchor.before(container);
+      lastBefore.set(anchor, container);
+    } else {
+      const previous = lastAfter.get(anchor) || anchor;
+      previous.after(container);
+      lastAfter.set(anchor, container);
+    }
+    container.querySelectorAll('[data-cms-image-ref]').forEach((image) => cmsSetImage(image, image.dataset.cmsImageRef));
+  });
+};
 const cmsQuery = new URLSearchParams(window.location.search);
 const cmsPreviewMode = cmsQuery.get('cmsPreview') === '1';
 const cmsPreviewVariant = cmsQuery.get('previewMode') === 'published' ? 'published' : 'draft';
@@ -640,11 +724,14 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     if (footerCols[1]) { cmsText('h3', footerCopy.paymentHeading, false, footerCols[1]); cmsText('span:nth-of-type(1)', footerCopy.mpesa, false, footerCols[1]); cmsText('span:nth-of-type(2)', footerCopy.crdb, false, footerCols[1]); cmsText('span:nth-of-type(3)', footerCopy.cash, false, footerCols[1]); }
     if (footerCols[2]) { cmsText('h3', footerCopy.socialHeading, false, footerCols[2]); cmsText('span:nth-of-type(1)', footerCopy.socialOne, false, footerCols[2]); cmsText('span:nth-of-type(2)', footerCopy.socialTwo, false, footerCols[2]); }
   }
+  cmsApplySectionOrder(content);
+  cmsApplySectionVisibility(content);
+  renderCmsBlocks(content.blocks, lang);
 };
 const applyCmsPageContent = (content) => {
-  if (!content?.elements || document.body.dataset.page === 'home') return;
+  if (!content || document.body.dataset.page === 'home') return;
   window.EcoPowerCmsFields?.install(document.body.dataset.page);
-  content.elements.forEach((element) => {
+  (content.elements || []).forEach((element) => {
     const escaped = element.field_id && window.CSS?.escape ? window.CSS.escape(element.field_id) : element.field_id?.replace(/(["\\])/g, '\\$1');
     const target = (escaped && document.querySelector(`[data-cms-id="${escaped}"]`)) || document.querySelectorAll(element.selector)[element.index];
     if (!target) return;
@@ -657,6 +744,9 @@ const applyCmsPageContent = (content) => {
       if (element.href !== undefined && target.tagName === 'A') target.href = element.href;
     }
   });
+  cmsApplySectionOrder(content);
+  cmsApplySectionVisibility(content);
+  renderCmsBlocks(content.blocks, document.documentElement.lang || 'en');
 };
 window.__ecopowerApplyPreview = (content, language = 'en', version = '') => {
   cmsPreviewOverride = { content, language, version };

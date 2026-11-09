@@ -103,6 +103,88 @@ const nowIso = () => new Date().toISOString();
 const safeJson = (value) => JSON.stringify(value ?? {});
 const parseJson = (value) => typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return {}; } })() : (value || {});
 const cleanEmail = (value) => String(value || '').trim().toLowerCase();
+const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery']);
+const BLOCK_ID = /^[a-z0-9][a-z0-9_-]{1,79}$/i;
+const BLOCK_IMAGE_LIMIT = 50;
+const BLOCK_CARD_LIMIT = 30;
+const BLOCK_TEXT_LIMIT = 4000;
+function splitBlocks(content) {
+  const source = content && typeof content === 'object' && !Array.isArray(content) ? { ...content } : {};
+  const blocks = Array.isArray(source.blocks) ? source.blocks : [];
+  delete source.blocks;
+  return { content: source, blocks };
+}
+function withBlocks(content, blocks) {
+  const source = content && typeof content === 'object' && !Array.isArray(content) ? { ...content } : {};
+  return { ...source, blocks: Array.isArray(blocks) ? blocks : [] };
+}
+function currentBlockRecord(row) { return withBlocks(parseJson(row.content_json), parseJson(row.blocks_json)); }
+function blockCopy(block, language) { return block?.[language] || block?.en || block?.sw || {}; }
+function validateBlockText(value, label, max = BLOCK_TEXT_LIMIT) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return `${label} must be text.`;
+  if (value.length > max) return `${label} is too long.`;
+  return null;
+}
+function validateBlock(block, index, slug) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return `Invalid dynamic block ${index + 1} on ${slug}.`;
+  if (!DYNAMIC_BLOCK_TYPES.has(block.type)) return `Unsupported dynamic block type on ${slug}.`;
+  if (typeof block.id !== 'string' || !BLOCK_ID.test(block.id)) return `Dynamic block ${index + 1} has an invalid ID.`;
+  if (block.visible !== undefined && typeof block.visible !== 'boolean') return `Dynamic block ${block.id} visibility must be boolean.`;
+  if (block.type === 'imageText' && !['left', 'right'].includes(block.layout || 'left')) return `Dynamic block ${block.id} image alignment is invalid.`;
+  if (['image', 'imageText'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
+  if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic block ${block.id} has an invalid image reference.`;
+  const languages = ['en', 'sw'];
+  for (const language of languages) {
+    const copy = blockCopy(block, language);
+    for (const [key, max] of [['heading', 180], ['subheading', 180], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['buttonLabel', 100], ['buttonLink', 1000], ['alt', 250], ['caption', 300]]) {
+      const error = validateBlockText(copy[key], `Dynamic block ${block.id} ${language}.${key}`, max);
+      if (error) return error;
+    }
+    if (copy.buttonLink && !SAFE_HREF.test(copy.buttonLink)) return `Dynamic block ${block.id} has an invalid button link.`;
+  }
+  if (block.type === 'cards') {
+    if (!Array.isArray(block.cards) || block.cards.length > BLOCK_CARD_LIMIT) return `Dynamic block ${block.id} can contain at most ${BLOCK_CARD_LIMIT} cards.`;
+    for (const [cardIndex, card] of block.cards.entries()) {
+      if (!card || typeof card !== 'object' || typeof card.id !== 'string' || !BLOCK_ID.test(card.id)) return `Dynamic block ${block.id} card ${cardIndex + 1} has an invalid ID.`;
+      if (card.image && (!SAFE_IMAGE.test(card.image) || validateImageReference(card.image))) return `Dynamic block ${block.id} card ${card.id} has an invalid image reference.`;
+      for (const language of languages) {
+        const copy = blockCopy(card, language);
+        for (const [key, max] of [['title', 180], ['description', BLOCK_TEXT_LIMIT], ['alt', 250]]) {
+          const error = validateBlockText(copy[key], `Dynamic block ${block.id} card ${card.id} ${language}.${key}`, max);
+          if (error) return error;
+        }
+      }
+    }
+  }
+  if (block.type === 'gallery') {
+    if (!Array.isArray(block.images) || block.images.length > BLOCK_IMAGE_LIMIT) return `Dynamic block ${block.id} can contain at most ${BLOCK_IMAGE_LIMIT} gallery images.`;
+    for (const [imageIndex, item] of block.images.entries()) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !BLOCK_ID.test(item.id) || typeof item.image !== 'string' || !item.image) return `Dynamic block ${block.id} gallery image ${imageIndex + 1} is invalid.`;
+      if (!SAFE_IMAGE.test(item.image) || validateImageReference(item.image)) return `Dynamic block ${block.id} gallery image ${item.id} has an invalid image reference.`;
+      for (const language of languages) {
+        const copy = blockCopy(item, language);
+        for (const [key, max] of [['caption', 300], ['alt', 250]]) {
+          const error = validateBlockText(copy[key], `Dynamic block ${block.id} gallery image ${item.id} ${language}.${key}`, max);
+          if (error) return error;
+        }
+      }
+    }
+  }
+  return null;
+}
+function validateBlocks(slug, blocks) {
+  if (blocks === undefined) return null;
+  if (!Array.isArray(blocks) || blocks.length > BLOCK_IMAGE_LIMIT) return `A page can contain at most ${BLOCK_IMAGE_LIMIT} dynamic blocks.`;
+  const ids = new Set();
+  for (const [index, block] of blocks.entries()) {
+    if (ids.has(block?.id)) return `Dynamic block IDs must be unique on ${slug}.`;
+    ids.add(block?.id);
+    const error = validateBlock(block, index, slug);
+    if (error) return error;
+  }
+  return null;
+}
 const publicUrlFor = (fileName) => `/uploads/published/${encodeURIComponent(fileName)}`;
 function blobPathname(value) {
   const raw = String(value || '');
@@ -120,23 +202,24 @@ async function pageId(executor, slug) { return (await query(executor, 'SELECT id
 async function currentContent(executor, slug, status, language) {
   const id = await pageId(executor, slug);
   if (!id) return null;
-  const row = (await query(executor, 'SELECT id, version, content_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
-  return row ? { id: row.id, version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at } : null;
+  const row = (await query(executor, 'SELECT id, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
+  return row ? { id: row.id, version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at } : null;
 }
 async function allContent(executor, slug, status) {
   const id = await pageId(executor, slug);
   if (!id) return {};
-  const result = await query(executor, 'SELECT language, version, content_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2', [id, status]);
-  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: parseJson(row.content_json), updated_at: row.updated_at }]));
+  const result = await query(executor, 'SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2', [id, status]);
+  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: currentBlockRecord(row), updated_at: row.updated_at }]));
 }
 async function saveContent(executor, slug, status, content, userId, language = 'en') {
   const id = await pageId(executor, slug);
   if (!id) throw new Error('Unknown page.');
   const existing = (await query(executor, 'SELECT version FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
   const version = Number(existing?.version || 0) + 1;
-  await query(executor, `INSERT INTO page_content (page_id, language, status, content_json, version, created_by, updated_at)
-    VALUES ($1, $2, $3, $4::jsonb, $5, $6, CURRENT_TIMESTAMP)
-    ON CONFLICT(page_id, language, status) DO UPDATE SET content_json = EXCLUDED.content_json, version = EXCLUDED.version, created_by = EXCLUDED.created_by, updated_at = CURRENT_TIMESTAMP`, [id, language, status, safeJson(content), version, userId]);
+  const split = splitBlocks(content);
+  await query(executor, `INSERT INTO page_content (page_id, language, status, content_json, blocks_json, version, created_by, updated_at)
+    VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, CURRENT_TIMESTAMP)
+    ON CONFLICT(page_id, language, status) DO UPDATE SET content_json = EXCLUDED.content_json, blocks_json = EXCLUDED.blocks_json, version = EXCLUDED.version, created_by = EXCLUDED.created_by, updated_at = CURRENT_TIMESTAMP`, [id, language, status, safeJson(split.content), safeJson(split.blocks), version, userId]);
   return { version };
 }
 function collectMediaMarkers(value, found = new Set()) {
@@ -192,7 +275,7 @@ function sameOrigin(req, res, next) {
 function audit(req, action, target, metadata = {}) { console.log(JSON.stringify({ at: nowIso(), actor: req.user?.email || 'public', action, target, metadata })); }
 const EDITABLE_SELECTORS = new Set(['main h1, main h2, main h3, main p, main strong, main span, main a, main button, footer h3, footer p, footer span, footer a', 'main img, footer img']);
 const SAFE_HREF = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i;
-const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/(?:jpeg|png|webp|avif);base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif)(?:[?#].*)?)$/i;
+const SAFE_IMAGE = /^(?:media:[^\s]+|https?:\/\/[^\s]+|data:image\/(?:jpeg|png|webp|avif|gif);base64,[a-z0-9+/=]+|\/[^\s]+|[a-z0-9_ ./-]+\.(?:jpe?g|png|webp|avif|gif)(?:[?#].*)?)$/i;
 function validateStructuredImages(value, pathName = 'content') {
   if (Array.isArray(value)) {
     for (const [index, item] of value.entries()) {
@@ -220,6 +303,8 @@ async function validateContent(slug, content) {
   if (serialized.length > 2 * 1024 * 1024) return 'Content payload is too large.';
   const structuredImageError = validateStructuredImages(content);
   if (structuredImageError) return `${structuredImageError} on ${slug}.`;
+  const blockError = validateBlocks(slug, content?.blocks);
+  if (blockError) return blockError;
   const externalImageUrls = collectExternalImageUrls(content);
   if (Array.isArray(content?.elements)) content.elements.forEach((element) => { if (element?.kind === 'image' && /^https:\/\//i.test(element.value || '')) externalImageUrls.push(element.value); });
   for (const url of new Set(externalImageUrls)) {
@@ -298,7 +383,10 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
     await client.query('BEGIN');
     for (const language of languages) {
       const current = await currentContent(client, req.params.slug, 'published', language);
-      if (current) await query(client, 'INSERT INTO content_revisions (page_id, language, version, content_json, created_by) VALUES ($1, $2, $3, $4::jsonb, $5)', [page.id, language, current.version, safeJson(current.content), req.user.id]);
+      if (current) {
+        const split = splitBlocks(current.content);
+        await query(client, 'INSERT INTO content_revisions (page_id, language, version, content_json, blocks_json, created_by) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6)', [page.id, language, current.version, safeJson(split.content), safeJson(split.blocks), req.user.id]);
+      }
       await saveContent(client, req.params.slug, 'published', materialized[language], req.user.id, language);
     }
     await client.query('COMMIT');
@@ -313,9 +401,9 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
 app.post('/api/pages/:slug/restore/:revisionId', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => {
   try {
     const pageKey = await pageId(pool, req.params.slug);
-    const revision = (await query(pool, 'SELECT page_id, language, content_json FROM content_revisions WHERE id = $1', [Number(req.params.revisionId)])).rows[0];
+    const revision = (await query(pool, 'SELECT page_id, language, content_json, blocks_json FROM content_revisions WHERE id = $1', [Number(req.params.revisionId)])).rows[0];
     if (!revision || revision.page_id !== pageKey) return res.status(404).json({ error: 'Revision not found.' });
-    await saveContent(pool, req.params.slug, 'draft', parseJson(revision.content_json), req.user.id, revision.language);
+    await saveContent(pool, req.params.slug, 'draft', withBlocks(parseJson(revision.content_json), parseJson(revision.blocks_json)), req.user.id, revision.language);
     audit(req, 'revision.restore', req.params.slug, { revisionId: revision.id });
     res.json({ ok: true, draft: await allContent(pool, req.params.slug, 'draft') });
   } catch (error) { next(error); }

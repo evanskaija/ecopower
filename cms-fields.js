@@ -228,7 +228,11 @@
     if (!root) return;
     get(page).forEach((definition) => {
       const element = root.querySelector(definition.selector);
-      if (element) element.setAttribute('data-cms-id', definition.id);
+      if (element) {
+        element.setAttribute('data-cms-id', definition.id);
+        const section = element.closest('section, footer');
+        if (section && !section.dataset.cmsSection) section.dataset.cmsSection = definition.group || 'content';
+      }
     });
   };
   return { definitions, get, find, install };

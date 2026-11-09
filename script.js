@@ -474,6 +474,7 @@ const cmsBlockCopy = (block, language) => block?.[language] || block?.en || bloc
 const cmsFormatClass = (format = {}) => {
   const allowed = {
     size: ['small', 'medium', 'large', 'display'],
+    font: ['sans', 'serif', 'display'],
     weight: ['regular', 'bold'],
     style: ['normal', 'italic'],
     color: ['ink', 'forest', 'muted', 'accent'],
@@ -481,6 +482,13 @@ const cmsFormatClass = (format = {}) => {
     spacing: ['tight', 'normal', 'loose']
   };
   return Object.entries(allowed).map(([key, values]) => values.includes(format[key]) ? `cms-format-${key}-${format[key]}` : '').filter(Boolean).join(' ');
+};
+const cmsApplyTextFormat = (selector, format, scope = document) => {
+  const element = scope.querySelector(selector);
+  if (!element) return;
+  element.classList.remove(...[...element.classList].filter((name) => name.startsWith('cms-format-')));
+  const classes = cmsFormatClass(format).split(' ').filter(Boolean);
+  if (classes.length) element.classList.add(...classes);
 };
 const cmsFormatTag = (format = {}, fallback = 'p') => ['p', 'h2', 'h3'].includes(format.heading) ? format.heading : fallback;
 const cmsFormattedText = (value, format = {}, fallbackTag = 'p') => {
@@ -507,6 +515,8 @@ const cmsBlockMarkup = (block, language) => {
     const text = `<div class="cms-dynamic-copy">${cmsFormattedText(copy.heading, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div>`;
     return `<section class="cms-dynamic-block cms-dynamic-image-text section section-white"><div class="page-width cms-dynamic-image-text-grid layout-${block.layout === 'right' ? 'right' : 'left'}">${block.layout === 'right' ? `${text}${image}` : `${image}${text}`}</div></section>`;
   }
+  if (block.type === 'payment') return `<section class="cms-dynamic-block cms-dynamic-payment section section-cream"><div class="page-width cms-dynamic-image-text-grid layout-left"><div class="cms-dynamic-image-text-media">${cmsBlockImage(block.image, copy, '', block.position)}</div><div class="cms-dynamic-copy">${cmsFormattedText(copy.title, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${copy.instruction ? `<p class="cms-dynamic-payment-instruction">${cmsEscape(copy.instruction)}</p>` : ''}</div></div></section>`;
+  if (block.type === 'stove') return `<section class="cms-dynamic-block cms-dynamic-stove section section-cream"><div class="page-width cms-dynamic-card-grid"><article class="cms-dynamic-card">${cmsBlockImage(block.image, copy, '', block.position)}${cmsFormattedText(copy.title, copy.format, 'h3')}${cmsFormattedText(copy.description, copy.format, 'p')}${block.price ? `<strong class="cms-dynamic-price">${cmsEscape(block.price)}</strong>` : ''}</article></div></section>`;
   if (block.type === 'cards' || block.type === 'product') {
     const cards = block.type === 'product' ? [block] : (block.cards || []);
     return `<section class="cms-dynamic-block cms-dynamic-cards section section-cream"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${cmsFormattedText(copy.heading, copy.format, 'h2')}</div>${cmsFormattedText(copy.description, copy.format, 'p')}</div><div class="cms-dynamic-card-grid">${cards.map((card) => { const item = block.type === 'product' ? copy : cmsBlockCopy(card, language); const orderLink = block.type === 'product' ? block.link : (item.buttonLink || copy.buttonLink); return `<article class="cms-dynamic-card">${card.image ? cmsBlockImage(card.image, item, '', card.position) : ''}${item.kicker ? `<p class="card-kicker">${cmsEscape(item.kicker)}</p>` : ''}${cmsFormattedText(item.title || item.name, item.format || copy.format, 'h3')}${cmsFormattedText(item.description, item.format || copy.format, 'p')}${item.price ? `<strong class="cms-dynamic-price">${cmsEscape(item.price)}</strong>` : ''}${block.type === 'product' || item.buttonLabel ? cmsBlockButton({ buttonLabel: item.buttonLabel || copy.buttonLabel, buttonLink: orderLink }) : ''}</article>`; }).join('')}</div></div></section>`;
@@ -533,7 +543,8 @@ const cmsSectionElement = (anchor) => {
   if (!anchor) return null;
   cmsMarkHomeSections();
   const key = String(anchor).startsWith('block:') ? String(anchor).slice(6) : String(anchor);
-  return [...document.querySelectorAll('[data-cms-section]')].find((element) => element.dataset.cmsSection === key) || null;
+  const resolvedKey = key === 'payment' ? 'ordering' : key === 'testimonial' ? 'kitchen' : key;
+  return [...document.querySelectorAll('[data-cms-section]')].find((element) => element.dataset.cmsSection === resolvedKey) || null;
 };
 const cmsApplySectionOrder = (content) => {
   const main = document.querySelector('main');
@@ -623,6 +634,8 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsText('.hero .eyebrow', heroCopy.eyebrow);
     cmsText('.hero h1', cmsHeadline(heroCopy), true);
     cmsText('.hero .hero-copy > p:not(.eyebrow)', heroCopy.description);
+    cmsApplyTextFormat('.hero h1', heroCopy.format);
+    cmsApplyTextFormat('.hero .hero-copy > p:not(.eyebrow)', heroCopy.format);
     const heroButtons = document.querySelectorAll('.hero-actions a');
     if (heroButtons[0]) { heroButtons[0].textContent = heroCopy.primaryLabel; heroButtons[0].href = hero?.primaryLink || heroButtons[0].href; }
     if (heroButtons[1]) { heroButtons[1].textContent = heroCopy.secondaryLabel; heroButtons[1].href = hero?.secondaryLink || heroButtons[1].href; }
@@ -645,6 +658,8 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     if (!element || !copy) return;
     cmsText(`.trust-item:nth-child(${index + 1}) strong`, copy.title);
     cmsText(`.trust-item:nth-child(${index + 1}) span`, copy.description);
+    cmsApplyTextFormat(`.trust-item:nth-child(${index + 1}) strong`, copy.format);
+    cmsApplyTextFormat(`.trust-item:nth-child(${index + 1}) span`, copy.format);
   });
   const products = content.products;
   const productsCopy = products?.[lang] || products?.en;
@@ -652,12 +667,16 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsText('#products .section-heading .eyebrow', productsCopy.eyebrow);
     cmsText('#products .section-heading h2', productsCopy.heading);
     cmsText('#products .section-heading > p', productsCopy.description);
+    cmsApplyTextFormat('#products .section-heading h2', productsCopy.format);
+    cmsApplyTextFormat('#products .section-heading > p', productsCopy.format);
     products?.items?.forEach((product, index) => {
       const card = document.querySelectorAll('#products .product-card')[index];
       const copy = product[lang] || product.en;
       if (!card || !copy) return;
       cmsText('h3', copy.name, false, card);
       cmsText('p:not(.card-kicker)', copy.description, false, card);
+      cmsApplyTextFormat('h3', copy.format, card);
+      cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card);
       cmsText('.price-row strong', product.price, false, card);
       const weight = copy.name.match(/\d+\s?kg/i)?.[0] || '';
       cmsText('.price-row span', weight, false, card);
@@ -677,6 +696,8 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
       cmsText('.eyebrow', productsCopy.businessLabel, false, business);
       cmsText('h3', productsCopy.businessHeading, false, business);
       cmsText('p', productsCopy.businessDescription, false, business);
+      cmsApplyTextFormat('h3', productsCopy.businessFormat, business);
+      cmsApplyTextFormat('p', productsCopy.businessFormat, business);
       business.querySelectorAll('li').forEach((item, index) => { if (productsCopy.list?.[index]) item.textContent = productsCopy.list[index]; });
       const button = business.querySelector('.button');
       if (button) button.textContent = productsCopy.businessButton;
@@ -686,10 +707,13 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
   const orderingCopy = ordering?.[lang] || ordering?.en;
   if (orderingCopy) {
     cmsText('#how-it-works .section-heading h2', cmsHeadlineWithEmphasis(orderingCopy.heading, lang), true);
-    orderingCopy.steps?.forEach((step, index) => { cmsText(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.title); cmsText(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.description); });
+    cmsApplyTextFormat('#how-it-works .section-heading h2', orderingCopy.format);
+    orderingCopy.steps?.forEach((step, index) => { cmsText(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.title); cmsText(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.description); cmsApplyTextFormat(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.format); cmsApplyTextFormat(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.format); });
     cmsText('#how-it-works .payment-copy .eyebrow', orderingCopy.paymentEyebrow);
     cmsText('#how-it-works .payment-copy h3', orderingCopy.paymentTitle);
     cmsText('#how-it-works .payment-copy > p', orderingCopy.paymentDescription);
+    cmsApplyTextFormat('#how-it-works .payment-copy h3', orderingCopy.paymentFormat);
+    cmsApplyTextFormat('#how-it-works .payment-copy > p', orderingCopy.paymentFormat);
     const rows = document.querySelectorAll('#how-it-works .payment-row');
     [[orderingCopy.mpesaLabel, orderingCopy.mpesaNumber, orderingCopy.mpesaNote], [orderingCopy.crdbLabel, orderingCopy.crdbNumber, orderingCopy.crdbNote]].forEach((row, index) => { if (!rows[index]) return; cmsText('span', row[0], false, rows[index]); cmsText('strong', row[1], false, rows[index]); cmsText('small', row[2], false, rows[index]); });
   }
@@ -699,6 +723,8 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsText('.story-copy .eyebrow', factoryCopy.eyebrow);
     cmsText('.story-copy h2', factoryCopy.title);
     cmsText('.story-copy > p', factoryCopy.description);
+    cmsApplyTextFormat('.story-copy h2', factoryCopy.format);
+    cmsApplyTextFormat('.story-copy > p', factoryCopy.format);
     cmsText('.story-copy .text-link', `${factoryCopy.button} →`);
     cmsImage('.factory-main-image', factory.image, factoryCopy.alt, factory.imagePosition);
   }
@@ -707,9 +733,12 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
   if (kitchenCopy) {
     cmsText('.kitchen-section .section-heading .eyebrow', kitchenCopy.eyebrow);
     cmsText('.kitchen-section .section-heading h2', kitchenCopy.title);
+    cmsApplyTextFormat('.kitchen-section .section-heading h2', kitchenCopy.format);
     kitchenCopy.categories?.forEach((value, index) => cmsText(`.category-grid .category-card:nth-child(${index + 1}) span`, value));
     cmsText('.kitchen-quote blockquote', kitchenCopy.quote);
     cmsText('.kitchen-quote p', kitchenCopy.translation);
+    cmsApplyTextFormat('.kitchen-quote blockquote', kitchenCopy.testimonialFormat);
+    cmsApplyTextFormat('.kitchen-quote p', kitchenCopy.testimonialFormat);
     const attribution = kitchenCopy.attribution?.split(',') || [];
     cmsText('.kitchen-quote cite', `<strong>${cmsEscape(attribution.shift()?.trim() || '')}</strong>${attribution.length ? `, ${cmsEscape(attribution.join(',').trim())}` : ''}`, true);
     if (!homeImages) cmsImage('.category-grid .category-card img', kitchen.image, undefined, kitchen.imagePosition);
@@ -719,11 +748,14 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
   if (stoveCopy) {
     cmsText('.stove-showcase .section-heading h2', stoveCopy.title);
     cmsText('.stove-showcase .section-heading > p', stoveCopy.description);
+    cmsApplyTextFormat('.stove-showcase .section-heading h2', stoveCopy.format);
+    cmsApplyTextFormat('.stove-showcase .section-heading > p', stoveCopy.format);
     stoves.items?.forEach((item, index) => {
       const card = document.querySelectorAll('.home-stove-card')[index];
       const copy = item[lang] || item.en;
       if (!card || !copy) return;
       cmsText('.card-kicker', copy.kicker, false, card); cmsText('h3', copy.name, false, card); cmsText('p:not(.card-kicker)', copy.description, false, card); cmsText('.home-stove-price', copy.price, false, card);
+      cmsApplyTextFormat('h3', copy.format, card); cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card);
       const button = card.querySelector('.button'); if (button) button.textContent = copy.button;
       cmsImage('img', item.image, copy.alt, item.imagePosition, card);
     });
@@ -732,16 +764,18 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
   const impactCopy = impact?.[lang] || impact?.en;
   if (impactCopy) {
     cmsText('.home-impact-summary h2', impactCopy.title);
-    impact.stats?.forEach((stat, index) => { cmsText(`.home-impact-stats > div:nth-child(${index + 1}) strong`, stat.value); cmsText(`.home-impact-stats > div:nth-child(${index + 1}) span`, stat[lang] || stat.en); });
+    cmsApplyTextFormat('.home-impact-summary h2', impactCopy.format);
+    impact.stats?.forEach((stat, index) => { cmsText(`.home-impact-stats > div:nth-child(${index + 1}) strong`, stat.value); cmsText(`.home-impact-stats > div:nth-child(${index + 1}) span`, stat[lang] || stat.en); cmsApplyTextFormat(`.home-impact-stats > div:nth-child(${index + 1}) span`, stat[`${lang}Format`]); });
     cmsText('.home-impact-summary > .page-width > p', impactCopy.note);
+    cmsApplyTextFormat('.home-impact-summary > .page-width > p', impactCopy.format);
   }
   const partners = content.partners;
   const partnerCopy = partners?.[lang] || partners?.en;
-  if (partnerCopy) { cmsText('.home-wakala-card h2', partnerCopy.title); cmsText('.home-wakala-card p', partnerCopy.description); const button = document.querySelector('.home-wakala-card .button'); if (button) { button.textContent = partnerCopy.button; button.href = partners.link || button.href; } }
+  if (partnerCopy) { cmsText('.home-wakala-card h2', partnerCopy.title); cmsText('.home-wakala-card p', partnerCopy.description); cmsApplyTextFormat('.home-wakala-card h2', partnerCopy.format); cmsApplyTextFormat('.home-wakala-card p', partnerCopy.format); const button = document.querySelector('.home-wakala-card .button'); if (button) { button.textContent = partnerCopy.button; button.href = partners.link || button.href; } }
   const footer = content.footer;
   const footerCopy = footer?.[lang] || footer?.en;
   if (footerCopy) {
-    cmsText('.footer-name', footerCopy.brand); cmsText('.footer-brand > p', footerCopy.description);
+    cmsText('.footer-name', footerCopy.brand); cmsText('.footer-brand > p', footerCopy.description); cmsApplyTextFormat('.footer-name', footerCopy.format); cmsApplyTextFormat('.footer-brand > p', footerCopy.format);
     const footerCols = document.querySelectorAll('.footer-col');
     if (footerCols[0]) { cmsText('h3', footerCopy.contactHeading, false, footerCols[0]); cmsText('a:nth-of-type(1)', footerCopy.phone, false, footerCols[0]); cmsText('a:nth-of-type(2)', footerCopy.email, false, footerCols[0]); cmsText('span', footerCopy.address, false, footerCols[0]); }
     if (footerCols[1]) { cmsText('h3', footerCopy.paymentHeading, false, footerCols[1]); cmsText('span:nth-of-type(1)', footerCopy.mpesa, false, footerCols[1]); cmsText('span:nth-of-type(2)', footerCopy.crdb, false, footerCols[1]); cmsText('span:nth-of-type(3)', footerCopy.cash, false, footerCols[1]); }

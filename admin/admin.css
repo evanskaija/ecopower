@@ -201,6 +201,8 @@ button { cursor: pointer; }
 .media-upload-status.is-success { color: var(--admin-green); }
 .media-upload-status.is-busy { color: var(--admin-forest); }
 .add-content-modal { width: min(690px, calc(100vw - 34px)); }
+.add-content-modal > .add-content-form-heading { margin: 0 24px 15px; }
+.add-content-modal > form { padding: 0 24px 24px; }
 .add-content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; padding: 4px 24px 25px; }
 .add-content-grid button { display: grid; gap: 6px; min-height: 104px; padding: 16px; border: 1px solid var(--admin-line); border-radius: 10px; background: #fbfdfb; color: var(--admin-ink); text-align: left; cursor: pointer; }
 .add-content-grid button:hover { border-color: var(--admin-green); background: #f2fbf1; box-shadow: 0 5px 16px rgba(9,43,32,.08); }
@@ -401,7 +403,8 @@ body.admin-shell { background: radial-gradient(circle at 77% -12%, rgba(25,175,1
   .section-row-actions .primary-section-action::after { content: 'Edit'; font-size: 9px; }
   .section-row-actions .add-content-action { font-size: 0; }
   .section-row-actions .add-content-action::after { content: 'Add'; font-size: 9px; }
-  .add-content-form-view { padding: 0 17px 18px; }
+  .add-content-form-view, .add-content-modal > form { padding: 0 17px 18px; }
+  .add-content-modal > .add-content-form-heading { margin: 0 17px 12px; }
   .add-content-form-actions { align-items: stretch; flex-direction: column; }
   .add-content-form-actions > div { justify-content: flex-end; }
   .format-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }

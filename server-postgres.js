@@ -103,13 +103,14 @@ const nowIso = () => new Date().toISOString();
 const safeJson = (value) => JSON.stringify(value ?? {});
 const parseJson = (value) => typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return {}; } })() : (value || {});
 const cleanEmail = (value) => String(value || '').trim().toLowerCase();
-const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery', 'product', 'partner', 'testimonial', 'cta']);
+const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery', 'product', 'payment', 'stove', 'partner', 'testimonial', 'cta']);
 const BLOCK_ID = /^[a-z0-9][a-z0-9_-]{1,79}$/i;
 const BLOCK_IMAGE_LIMIT = 50;
 const BLOCK_CARD_LIMIT = 30;
 const BLOCK_TEXT_LIMIT = 4000;
 const BLOCK_FORMAT_CHOICES = Object.freeze({
   size: new Set(['small', 'medium', 'large', 'display']),
+    font: new Set(['sans', 'serif', 'display']),
   weight: new Set(['regular', 'bold']),
   style: new Set(['normal', 'italic']),
   color: new Set(['ink', 'forest', 'muted', 'accent']),
@@ -159,12 +160,12 @@ function validateBlock(block, index, slug) {
   if (typeof block.id !== 'string' || !BLOCK_ID.test(block.id)) return `Dynamic block ${index + 1} has an invalid ID.`;
   if (block.visible !== undefined && typeof block.visible !== 'boolean') return `Dynamic block ${block.id} visibility must be boolean.`;
   if (block.type === 'imageText' && !['left', 'right'].includes(block.layout || 'left')) return `Dynamic block ${block.id} image alignment is invalid.`;
-  if (['image', 'imageText', 'product', 'partner', 'testimonial'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
+  if (['image', 'imageText', 'product', 'payment', 'stove', 'partner', 'testimonial'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
   if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic block ${block.id} has an invalid image reference.`;
   const languages = ['en', 'sw'];
   for (const language of languages) {
     const copy = blockCopy(block, language);
-    for (const [key, max] of [['heading', 180], ['subheading', 180], ['kicker', 120], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['quote', BLOCK_TEXT_LIMIT], ['attribution', 180], ['buttonLabel', 100], ['buttonLink', 1000], ['link', 1000], ['alt', 250], ['caption', 300]]) {
+    for (const [key, max] of [['heading', 180], ['subheading', 180], ['kicker', 120], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['instruction', 500], ['quote', BLOCK_TEXT_LIMIT], ['attribution', 180], ['buttonLabel', 100], ['buttonLink', 1000], ['link', 1000], ['alt', 250], ['caption', 300]]) {
       const error = validateBlockText(copy[key], `Dynamic block ${block.id} ${language}.${key}`, max);
       if (error) return error;
     }
@@ -204,10 +205,10 @@ function validateBlock(block, index, slug) {
       }
     }
   }
-  if (block.type === 'product') {
+  if (['product', 'stove'].includes(block.type)) {
     if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic product block ${block.id} has an invalid image reference.`;
     if (block.price !== undefined && (typeof block.price !== 'string' || block.price.length > 80)) return `Dynamic product block ${block.id} has an invalid price.`;
-    if (block.link && !SAFE_HREF.test(block.link)) return `Dynamic product block ${block.id} has an invalid order link.`;
+    if (block.type === 'product' && block.link && !SAFE_HREF.test(block.link)) return `Dynamic product block ${block.id} has an invalid order link.`;
   }
   if (block.type === 'partner' && block.link && !SAFE_HREF.test(block.link)) return `Dynamic partner block ${block.id} has an invalid website link.`;
   return null;

@@ -2,18 +2,24 @@
   'use strict';
 
   const sectionMeta = [
-    ['hero', 'Hero', 'Main headline, buttons and hero image', true],
+    ['hero', 'Hero', 'Main headline, buttons and hero image'],
     ['trust', 'Trust and benefits', 'Four homepage benefit items', false],
-    ['products', 'Products and prices', 'Makange bags and business orders', true],
-    ['ordering', 'Order in three steps & Pay by Lipa Namba', 'Ordering steps, payment instructions, account numbers and QR codes', true],
-    ['factory', 'Factory and Delivery', 'Factory story, delivery fleet and production gallery', true],
-    ['kitchen', 'Built for Real Kitchens & Customer Testimonial', 'Audience cards, customer testimonial and image gallery', true],
-    ['cookstoves', 'Cookstoves', 'Four stove cards and CTA', true],
-    ['impact', 'Our impact so far', 'Impact figures and source note', false],
-    ['partners', 'Become a Makange Agent & Partners and Funders', 'WAKALA CTA, partner names and replaceable logos', false],
-    ['images', 'Factory Gallery, QR Codes and Partner Logos', 'Shared image records, captions, alternative text and ordering', true],
+    ['products', 'Charcoal Briquettes', 'Product images, descriptions and prices'],
+    ['ordering', 'Order in Three Steps', 'Ordering instructions and delivery steps', false],
+    ['payment', 'Pay by Lipa Namba', 'Payment images, descriptions and account details'],
+    ['factory', 'Factory and Delivery', 'Factory story, delivery fleet and production gallery'],
+    ['kitchen', 'Built for Real Kitchens', 'Audience cards and cooking categories', false],
+    ['testimonial', 'Customer Testimonials', 'Customer quote and attribution', false],
+    ['cookstoves', 'Stoves for Every Kitchen', 'Stove images, descriptions and prices'],
+    ['impact', 'Our Impact So Far', 'Statistics and supporting descriptions', false],
+    ['partners', 'Partners and Donors', 'Partner logos, names and descriptions'],
+    ['images', 'Factory Gallery, QR Codes and Partner Logos', 'Shared image records, captions, alternative text and ordering'],
     ['footer', 'Footer', 'Contact, payment and social information', false]
   ];
+
+  const addContentSections = new Set(['products', 'payment', 'cookstoves', 'partners']);
+  const homeSectionSource = (section) => section === 'payment' ? 'ordering' : section === 'testimonial' ? 'kitchen' : section;
+  const canAddContent = (section) => addContentSections.has(section);
 
   const pageMeta = {
     home: { label: 'Home', file: 'index.html' },
@@ -552,7 +558,7 @@
     if (section === '__new-content__') return addContentDraft?.block || {};
     const dynamic = dynamicBlockForSection(section);
     if (dynamic) return dynamic;
-    return activePage === 'home' ? state.draft[section] : genericContent();
+    return activePage === 'home' ? state.draft[homeSectionSource(section)] : genericContent();
   }
   function blockCopyForEditor(block, code = language) {
     if (!block[code] || typeof block[code] !== 'object') block[code] = {};
@@ -564,7 +570,8 @@
       const publishedBlock = dynamicBlockForSection(id, currentPublished());
       return JSON.stringify(normalizeMediaForCompare(draftBlock)) !== JSON.stringify(normalizeMediaForCompare(publishedBlock));
     }
-    return JSON.stringify(normalizeMediaForCompare(state.draft[id])) !== JSON.stringify(normalizeMediaForCompare(state.published[id]));
+    const source = homeSectionSource(id);
+    return JSON.stringify(normalizeMediaForCompare(state.draft[source])) !== JSON.stringify(normalizeMediaForCompare(state.published[source]));
   }
 
   function pageIsDirty() { return JSON.stringify(normalizeMediaForCompare(currentDraft())) !== JSON.stringify(normalizeMediaForCompare(currentPublished())); }
@@ -643,11 +650,11 @@
     return `<div class="field-group"><label>${label}</label>${control}${options.formatPath ? formatToolbar(options.formatPath, options.format || {}) : ''}${options.help ? `<small>${options.help}</small>` : ''}</div>`;
   }
 
-  const textFormatDefaults = { size: 'medium', weight: 'regular', style: 'normal', color: 'ink', align: 'left', spacing: 'normal', heading: 'p' };
+  const textFormatDefaults = { size: 'medium', weight: 'regular', style: 'normal', color: 'ink', align: 'left', spacing: 'normal', heading: 'p', font: 'sans' };
   function formatToolbar(path, format = {}) {
     const value = { ...textFormatDefaults, ...(format || {}) };
     const select = (key, label, choices) => `<label><span>${label}</span><select class="format-select" data-format-path="${path}" data-format-key="${key}">${choices.map((choice) => `<option value="${choice}" ${value[key] === choice ? 'selected' : ''}>${choice[0].toUpperCase()}${choice.slice(1)}</option>`).join('')}</select></label>`;
-    return `<div class="format-toolbar" aria-label="Text formatting">${select('size', 'Size', ['small', 'medium', 'large', 'display'])}${select('weight', 'Weight', ['regular', 'bold'])}${select('style', 'Style', ['normal', 'italic'])}${select('color', 'Color', ['ink', 'forest', 'muted', 'accent'])}${select('align', 'Align', ['left', 'center', 'right'])}${select('spacing', 'Spacing', ['tight', 'normal', 'loose'])}${select('heading', 'Level', ['p', 'h2', 'h3'])}</div>`;
+    return `<div class="format-toolbar" aria-label="Text formatting">${select('size', 'Size', ['small', 'medium', 'large', 'display'])}${select('font', 'Font', ['sans', 'serif', 'display'])}${select('weight', 'Weight', ['regular', 'bold'])}${select('style', 'Style', ['normal', 'italic'])}${select('color', 'Color', ['ink', 'forest', 'muted', 'accent'])}${select('align', 'Align', ['left', 'center', 'right'])}${select('spacing', 'Spacing', ['tight', 'normal', 'loose'])}${select('heading', 'Level', ['p', 'h2', 'h3'])}</div>`;
   }
 
   function selectField(label, path, value, options = {}) {
@@ -676,46 +683,56 @@
 
   function renderHero(section) {
     const copy = activeCopy(section);
-    return `<p class="form-intro">Edit the most important content block on the public homepage. Headline emphasis is controlled separately so unsafe HTML cannot be entered.</p>${mediaPicker('Hero image', 'image', section.image, { positionPath: 'imagePosition' })}${field('Small introductory heading', `${language}.eyebrow`, copy.eyebrow)}${field('Main headline', `${language}.title`, copy.title)}${field('Italic / emphasized words', `${language}.emphasis`, copy.emphasis, { help: 'Displayed using the approved italic headline style.' })}${field('Supporting description', `${language}.description`, copy.description, { textarea: true })}<div class="subsection">Buttons and contact line</div>${field('Primary button text', `${language}.primaryLabel`, copy.primaryLabel)}${field('Primary button link', 'primaryLink', section.primaryLink)}${field('Secondary button text', `${language}.secondaryLabel`, copy.secondaryLabel)}${field('Secondary button link', 'secondaryLink', section.secondaryLink)}${field('Contact label', `${language}.captionContact`, copy.captionContact)}${field('Payment caption', `${language}.caption`, copy.caption)}${field('Image alternative text', `${language}.alt`, copy.alt)}`;
+    return `<p class="form-intro">Edit the most important content on the public homepage.</p>${mediaPicker('Hero image', 'image', section.image, { positionPath: 'imagePosition' })}${field('Small introductory heading', `${language}.eyebrow`, copy.eyebrow)}${field('Main headline', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${field('Italic / emphasized words', `${language}.emphasis`, copy.emphasis, { help: 'Displayed using the approved italic headline style.' })}${field('Supporting description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}<div class="subsection">Buttons and contact line</div>${field('Primary button text', `${language}.primaryLabel`, copy.primaryLabel)}${field('Primary button link', 'primaryLink', section.primaryLink)}${field('Secondary button text', `${language}.secondaryLabel`, copy.secondaryLabel)}${field('Secondary button link', 'secondaryLink', section.secondaryLink)}${field('Contact label', `${language}.captionContact`, copy.captionContact)}${field('Payment caption', `${language}.caption`, copy.caption)}${field('Image alternative text', `${language}.alt`, copy.alt)}`;
   }
 
   function renderTrust(section) {
-    return `<p class="form-intro">Manage the four benefits shown directly after the hero. Each item keeps its approved icon and responsive position.</p>${section.items.map((item, index) => `<div class="repeat-card"><div class="repeat-card-header"><strong>Benefit ${index + 1}</strong><span>${item.icon} icon</span></div>${field('Title', `items.${index}.${language}.title`, item[language].title)}${field('Short description', `items.${index}.${language}.description`, item[language].description, { textarea: true })}</div>`).join('')}`;
+    return `<p class="form-intro">Manage the four benefits shown directly after the hero.</p>${section.items.map((item, index) => `<div class="repeat-card"><div class="repeat-card-header"><strong>Benefit ${index + 1}</strong><span>${item.icon} icon</span></div>${field('Title', `items.${index}.${language}.title`, item[language].title, { formatPath: `items.${index}.${language}.format`, format: item[language].format })}${field('Short description', `items.${index}.${language}.description`, item[language].description, { textarea: true, formatPath: `items.${index}.${language}.format`, format: item[language].format })}</div>`).join('')}`;
   }
 
   function renderProducts(section) {
     const copy = activeCopy(section);
-    return `${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Section heading', `${language}.heading`, copy.heading)}${field('Description', `${language}.description`, copy.description, { textarea: true })}${section.items.map((item, index) => `<div class="subsection">Product ${index + 1}</div><div class="repeat-card">${mediaPicker('Product photograph', `items.${index}.image`, item.image, { positionPath: `items.${index}.imagePosition` })}${field('Product name', `items.${index}.${language}.name`, item[language].name)}${field('Description', `items.${index}.${language}.description`, item[language].description, { textarea: true })}<div class="field-grid">${field('Price', `items.${index}.price`, item.price)}${field('Order link', `items.${index}.link`, item.link)}</div>${field('Button text', `items.${index}.${language}.button`, item[language].button)}${field('Alternative text', `items.${index}.${language}.alt`, item[language].alt)}</div>`).join('')}<div class="subsection">Business order card</div>${field('Label', `${language}.businessLabel`, copy.businessLabel)}${field('Heading', `${language}.businessHeading`, copy.businessHeading)}${field('Description', `${language}.businessDescription`, copy.businessDescription, { textarea: true })}${field('Button text', `${language}.businessButton`, copy.businessButton)}${copy.list.map((item, index) => field(`List item ${index + 1}`, `${language}.list.${index}`, item)).join('')}`;
+    return `${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Section heading', `${language}.heading`, copy.heading, { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}${section.items.map((item, index) => `<div class="subsection">Product ${index + 1}</div><div class="repeat-card">${mediaPicker('Product photograph', `items.${index}.image`, item.image, { positionPath: `items.${index}.imagePosition` })}${field('Product name', `items.${index}.${language}.name`, item[language].name, { formatPath: `items.${index}.${language}.format`, format: item[language].format })}${field('Description', `items.${index}.${language}.description`, item[language].description, { textarea: true, formatPath: `items.${index}.${language}.format`, format: item[language].format })}<div class="field-grid">${field('Price', `items.${index}.price`, item.price)}${field('Order link', `items.${index}.link`, item.link)}</div>${field('Button text', `items.${index}.${language}.button`, item[language].button)}${field('Alternative text', `items.${index}.${language}.alt`, item[language].alt)}</div>`).join('')}<div class="subsection">Business order card</div>${field('Label', `${language}.businessLabel`, copy.businessLabel)}${field('Heading', `${language}.businessHeading`, copy.businessHeading, { formatPath: `${language}.businessFormat`, format: copy.businessFormat })}${field('Description', `${language}.businessDescription`, copy.businessDescription, { textarea: true, formatPath: `${language}.businessFormat`, format: copy.businessFormat })}${field('Button text', `${language}.businessButton`, copy.businessButton)}${copy.list.map((item, index) => field(`List item ${index + 1}`, `${language}.list.${index}`, item)).join('')}`;
   }
 
   function renderOrdering(section) {
     const copy = activeCopy(section);
-    return `${field('Section heading', `${language}.heading`, copy.heading)}${copy.steps.map((step, index) => `<div class="subsection">Step ${index + 1}</div>${field('Step title', `${language}.steps.${index}.title`, step.title)}${field('Description', `${language}.steps.${index}.description`, step.description, { textarea: true })}`).join('')}<div class="subsection">Pay by Lipa Namba</div><p class="form-intro">Payment account numbers are protected. Changing either number requires confirmation and is recorded in the audit log.</p>${field('Payment section label', `${language}.paymentEyebrow`, copy.paymentEyebrow)}${field('Payment heading', `${language}.paymentTitle`, copy.paymentTitle)}${field('Instructions', `${language}.paymentDescription`, copy.paymentDescription, { textarea: true })}<div class="field-grid">${field('M-Pesa label', `${language}.mpesaLabel`, copy.mpesaLabel)}${field('M-Pesa number', `${language}.mpesaNumber`, copy.mpesaNumber, { confirmChange: 'Confirm changing the M-Pesa Lipa Namba? This will be recorded and can affect customer payments.' })}${field('CRDB label', `${language}.crdbLabel`, copy.crdbLabel)}${field('CRDB number', `${language}.crdbNumber`, copy.crdbNumber, { confirmChange: 'Confirm changing the CRDB Lipa Namba? This will be recorded and can affect customer payments.' })}</div>${field('M-Pesa note', `${language}.mpesaNote`, copy.mpesaNote)}${field('CRDB note', `${language}.crdbNote`, copy.crdbNote)}<div class="subsection">Payment QR codes</div>${mediaPicker('M-Pesa QR code', 'paymentQr.0.image', state.draft.images?.paymentQr?.[0]?.image || '', { section: 'images' })}${mediaPicker('CRDB QR code', 'paymentQr.1.image', state.draft.images?.paymentQr?.[1]?.image || '', { section: 'images' })}`;
+    return `${field('Section heading', `${language}.heading`, copy.heading, { formatPath: `${language}.format`, format: copy.format })}${copy.steps.map((step, index) => `<div class="subsection">Step ${index + 1}</div>${field('Step title', `${language}.steps.${index}.title`, step.title, { formatPath: `${language}.steps.${index}.format`, format: step.format })}${field('Description', `${language}.steps.${index}.description`, step.description, { textarea: true, formatPath: `${language}.steps.${index}.format`, format: step.format })}`).join('')}`;
+  }
+
+  function renderPayment(section) {
+    const copy = activeCopy(section);
+    return `<p class="form-intro">Payment account numbers are protected. Changing either number requires confirmation and is recorded in the audit log.</p>${field('Payment section label', `${language}.paymentEyebrow`, copy.paymentEyebrow)}${field('Payment heading', `${language}.paymentTitle`, copy.paymentTitle, { formatPath: `${language}.paymentFormat`, format: copy.paymentFormat })}${field('Instructions', `${language}.paymentDescription`, copy.paymentDescription, { textarea: true, formatPath: `${language}.paymentFormat`, format: copy.paymentFormat })}<div class="field-grid">${field('M-Pesa label', `${language}.mpesaLabel`, copy.mpesaLabel)}${field('M-Pesa number', `${language}.mpesaNumber`, copy.mpesaNumber, { confirmChange: 'Confirm changing the M-Pesa Lipa Namba? This will be recorded and can affect customer payments.' })}${field('CRDB label', `${language}.crdbLabel`, copy.crdbLabel)}${field('CRDB number', `${language}.crdbNumber`, copy.crdbNumber, { confirmChange: 'Confirm changing the CRDB Lipa Namba? This will be recorded and can affect customer payments.' })}</div>${field('M-Pesa note', `${language}.mpesaNote`, copy.mpesaNote)}${field('CRDB note', `${language}.crdbNote`, copy.crdbNote)}<div class="subsection">Payment images</div>${mediaPicker('M-Pesa QR code', 'paymentQr.0.image', state.draft.images?.paymentQr?.[0]?.image || '', { section: 'images' })}${mediaPicker('CRDB QR code', 'paymentQr.1.image', state.draft.images?.paymentQr?.[1]?.image || '', { section: 'images' })}`;
   }
 
   function renderFactory(section) {
     const copy = activeCopy(section);
-    return `${mediaPicker('Factory photograph', 'image', section.image, { positionPath: 'imagePosition' })}${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Heading', `${language}.title`, copy.title)}${field('Description', `${language}.description`, copy.description, { textarea: true })}${field('Button text', `${language}.button`, copy.button)}${field('Image alternative text', `${language}.alt`, copy.alt)}`;
+    return `${mediaPicker('Factory photograph', 'image', section.image, { positionPath: 'imagePosition' })}${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Heading', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button text', `${language}.button`, copy.button)}${field('Image alternative text', `${language}.alt`, copy.alt)}`;
   }
 
   function renderKitchen(section) {
     const copy = activeCopy(section);
-    return `${mediaPicker('Kitchen photograph', 'image', section.image, { positionPath: 'imagePosition' })}${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Heading', `${language}.title`, copy.title)}${copy.categories.map((item, index) => field(`Category ${index + 1}`, `${language}.categories.${index}`, item)).join('')}<div class="subsection">Customer quote</div>${field('Quote', `${language}.quote`, copy.quote, { textarea: true })}${field('English explanation', `${language}.translation`, copy.translation, { textarea: true })}${field('Attribution', `${language}.attribution`, copy.attribution)}`;
+    return `${mediaPicker('Kitchen photograph', 'image', section.image, { positionPath: 'imagePosition' })}${field('Section label', `${language}.eyebrow`, copy.eyebrow)}${field('Heading', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${copy.categories.map((item, index) => field(`Category ${index + 1}`, `${language}.categories.${index}`, item)).join('')}`;
+  }
+
+  function renderTestimonial(section) {
+    const copy = activeCopy(section);
+    return `${field('Customer quote', `${language}.quote`, copy.quote, { textarea: true, formatPath: `${language}.testimonialFormat`, format: copy.testimonialFormat })}${field('English explanation', `${language}.translation`, copy.translation, { textarea: true, formatPath: `${language}.testimonialFormat`, format: copy.testimonialFormat })}${field('Attribution', `${language}.attribution`, copy.attribution)}`;
   }
 
   function renderCookstoves(section) {
     const copy = activeCopy(section);
-    return `${field('Section heading', `${language}.title`, copy.title)}${field('Supporting description', `${language}.description`, copy.description, { textarea: true })}${section.items.map((item, index) => `<div class="subsection">Stove ${index + 1}</div><div class="repeat-card">${mediaPicker('Stove photograph', `items.${index}.image`, item.image, { positionPath: `items.${index}.imagePosition` })}${field('Category label', `items.${index}.${language}.kicker`, item[language].kicker)}${field('Stove name', `items.${index}.${language}.name`, item[language].name)}${field('Description', `items.${index}.${language}.description`, item[language].description, { textarea: true })}<div class="field-grid">${field('Price', `items.${index}.${language}.price`, item[language].price)}${field('Button text', `items.${index}.${language}.button`, item[language].button)}</div>${field('Alternative text', `items.${index}.${language}.alt`, item[language].alt)}</div>`).join('')}`;
+    return `${field('Section heading', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${field('Supporting description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}${section.items.map((item, index) => `<div class="subsection">Stove ${index + 1}</div><div class="repeat-card">${mediaPicker('Stove photograph', `items.${index}.image`, item.image, { positionPath: `items.${index}.imagePosition` })}${field('Category label', `items.${index}.${language}.kicker`, item[language].kicker)}${field('Stove name', `items.${index}.${language}.name`, item[language].name, { formatPath: `items.${index}.${language}.format`, format: item[language].format })}${field('Description', `items.${index}.${language}.description`, item[language].description, { textarea: true, formatPath: `items.${index}.${language}.format`, format: item[language].format })}<div class="field-grid">${field('Price', `items.${index}.${language}.price`, item[language].price)}${field('Button text', `items.${index}.${language}.button`, item[language].button)}</div>${field('Alternative text', `items.${index}.${language}.alt`, item[language].alt)}</div>`).join('')}`;
   }
 
   function renderImpact(section) {
     const copy = activeCopy(section);
-    return `${field('Section heading', `${language}.title`, copy.title)}${section.stats.map((stat, index) => `<div class="repeat-card"><div class="repeat-card-header"><strong>Statistic ${index + 1}</strong><span>Structured value</span></div>${field('Numerical value', `stats.${index}.value`, stat.value)}${field('Description', `stats.${index}.${language}`, stat[language], { textarea: true })}</div>`).join('')}${field('Source / qualification note', `${language}.note`, copy.note, { help: 'Keep verified results separate from estimates or projections.' })}`;
+    return `${field('Section heading', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${section.stats.map((stat, index) => `<div class="repeat-card"><div class="repeat-card-header"><strong>Statistic ${index + 1}</strong><span>Structured value</span></div>${field('Numerical value', `stats.${index}.value`, stat.value)}${field('Description', `stats.${index}.${language}`, stat[language], { textarea: true, formatPath: `stats.${index}.${language}Format`, format: stat[`${language}Format`] })}</div>`).join('')}${field('Source / qualification note', `${language}.note`, copy.note, { help: 'Keep verified results separate from estimates or projections.', formatPath: `${language}.format`, format: copy.format })}`;
   }
 
   function renderPartners(section) {
     const copy = activeCopy(section);
-    return `${field('Heading', `${language}.title`, copy.title)}${field('Description', `${language}.description`, copy.description, { textarea: true })}${field('Button text', `${language}.button`, copy.button)}${field('Button link', 'link', section.link)}<p class="form-intro">Partner logo records remain shared across languages. Replacing a logo is available from the Media Library in the next page editor phase.</p>`;
+    return `${field('Heading', `${language}.title`, copy.title, { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button text', `${language}.button`, copy.button)}${field('Button link', 'link', section.link)}<p class="form-intro">Partner logos can be replaced from the image controls below.</p>`;
   }
 
   function renderImageRecord(label, path, record) {
@@ -729,7 +746,7 @@
 
   function renderFooter(section) {
     const copy = activeCopy(section);
-    return `${field('Brand name', `${language}.brand`, copy.brand)}${field('Description', `${language}.description`, copy.description, { textarea: true })}${field('Contact heading', `${language}.contactHeading`, copy.contactHeading)}${field('Phone line', `${language}.phone`, copy.phone)}${field('Email', `${language}.email`, copy.email)}${field('Address', `${language}.address`, copy.address, { textarea: true })}${field('Payment heading', `${language}.paymentHeading`, copy.paymentHeading)}${field('M-Pesa line', `${language}.mpesa`, copy.mpesa)}${field('CRDB line', `${language}.crdb`, copy.crdb)}${field('Cash line', `${language}.cash`, copy.cash)}${field('Social heading', `${language}.socialHeading`, copy.socialHeading)}${field('Social line one', `${language}.socialOne`, copy.socialOne)}${field('Social line two', `${language}.socialTwo`, copy.socialTwo)}`;
+    return `${field('Brand name', `${language}.brand`, copy.brand, { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description, { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Contact heading', `${language}.contactHeading`, copy.contactHeading)}${field('Phone line', `${language}.phone`, copy.phone)}${field('Email', `${language}.email`, copy.email)}${field('Address', `${language}.address`, copy.address, { textarea: true })}${field('Payment heading', `${language}.paymentHeading`, copy.paymentHeading)}${field('M-Pesa line', `${language}.mpesa`, copy.mpesa)}${field('CRDB line', `${language}.crdb`, copy.crdb)}${field('Cash line', `${language}.cash`, copy.cash)}${field('Social heading', `${language}.socialHeading`, copy.socialHeading)}${field('Social line one', `${language}.socialOne`, copy.socialOne)}${field('Social line two', `${language}.socialTwo`, copy.socialTwo)}`;
   }
 
   function newBlockId(prefix = 'block') {
@@ -741,7 +758,7 @@
   }
 
   function newBlockCopy(label = 'New content section') {
-    return { heading: label, subheading: '', title: label, description: '', buttonLabel: '', buttonLink: '', alt: '', caption: '', quote: '', attribution: '', format: { ...textFormatDefaults } };
+    return { heading: label, subheading: '', kicker: '', title: label, description: '', instruction: '', buttonLabel: '', buttonLink: '', alt: '', caption: '', quote: '', attribution: '', format: { ...textFormatDefaults } };
   }
 
   function newCard(id) {
@@ -755,10 +772,12 @@
   }
 
   function newDynamicBlock(type) {
-    const block = { id: newBlockId(type), type, visible: true, en: newBlockCopy(), sw: newBlockCopy('Sehemu mpya ya maudhui') };
+    const block = { id: newBlockId(type), type, visible: true, en: newBlockCopy(''), sw: newBlockCopy('') };
     if (type === 'image' || type === 'imageText') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png'; block.position = 'center'; }
     if (type === 'imageText') block.layout = 'left';
-    if (type === 'product') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_004.jpeg'; block.position = 'center'; block.price = 'TZS 0'; block.link = 'https://wa.me/255784017225'; }
+    if (['product', 'payment', 'stove'].includes(type)) { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_004.jpeg'; block.position = 'center'; }
+    if (type === 'product') { block.price = ''; block.link = 'https://wa.me/255784017225'; }
+    if (type === 'stove') block.price = '';
     if (type === 'partner' || type === 'testimonial') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png'; block.position = 'center'; }
     if (type === 'cards') block.cards = [newCard(`${block.id}-card-1`)];
     if (type === 'gallery') block.images = [newGalleryImage(`${block.id}-image-1`)];
@@ -767,7 +786,8 @@
 
   function dynamicToolbar(block) {
     const visibilityLabel = block.visible === false ? 'Show on public page' : 'Hide from public page';
-    return `<div class="dynamic-block-toolbar"><span>${block.visible === false ? 'Hidden draft block' : 'Visible draft block'}</span><div><button type="button" class="section-action" data-action="toggle-block" data-block-id="${escapeHtml(block.id)}">${visibilityLabel}</button><button type="button" class="section-action" data-action="delete-block" data-block-id="${escapeHtml(block.id)}">Delete</button></div></div>`;
+    const index = dynamicBlocks().findIndex((item) => item.id === block.id);
+    return `<div class="dynamic-block-toolbar"><span>${block.visible === false ? 'Hidden from public page' : 'Visible on public page'}</span><div><button type="button" class="section-action" data-action="move-block-up" data-block-id="${escapeHtml(block.id)}" ${index <= 0 ? 'disabled' : ''}>Move up</button><button type="button" class="section-action" data-action="move-block-down" data-block-id="${escapeHtml(block.id)}" ${index < 0 || index === dynamicBlocks().length - 1 ? 'disabled' : ''}>Move down</button><button type="button" class="section-action" data-action="toggle-block" data-block-id="${escapeHtml(block.id)}">${visibilityLabel}</button><button type="button" class="section-action" data-action="delete-block" data-block-id="${escapeHtml(block.id)}">Delete</button></div></div>`;
   }
 
   function renderDynamicCard(block, card, index, sectionKey = activeSection) {
@@ -787,9 +807,9 @@
     if (block.type === 'gallery' && !Array.isArray(block.images)) block.images = [];
     const copy = blockCopyForEditor(block);
     const drawer = $('#editor-drawer');
-    const labels = { text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Card collection', gallery: 'Gallery', product: 'Product card', partner: 'Partner entry', testimonial: 'Customer testimonial', cta: 'Call to action' };
-    $('#drawer-title').textContent = labels[block.type] || 'Content block';
-    $('#drawer-description').textContent = 'Edit this added section, then save the draft before publishing it.';
+    const labels = { text: 'Added text', image: 'Added image', imageText: 'Added image and text', cards: 'Added products', gallery: 'Added gallery', product: 'Added briquette', payment: 'Added payment content', stove: 'Added stove', partner: 'Added partner', testimonial: 'Added customer testimonial', cta: 'Added call to action' };
+    $('#drawer-title').textContent = labels[block.type] || 'Added content';
+    $('#drawer-description').textContent = 'Edit this item, then save the draft before publishing it.';
     $('#drawer-language').textContent = language === 'sw' ? 'Kiswahili' : 'English';
     let html = dynamicToolbar(block);
     if (block.type === 'text') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
@@ -797,7 +817,9 @@
     if (block.type === 'imageText') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${selectField('Image alignment', 'layout', block.layout || 'left', { choices: ['left', 'right'] })}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     if (block.type === 'cards') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${block.cards.map((card, index) => renderDynamicCard(block, card, index)).join('')}<button type="button" class="admin-button button-outline" data-action="add-card" data-block-id="${escapeHtml(block.id)}">Add card</button>`;
     if (block.type === 'gallery') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${block.images.map((item, index) => renderDynamicGalleryImage(block, item, index)).join('')}<button type="button" class="admin-button button-outline" data-action="add-gallery-image" data-block-id="${escapeHtml(block.id)}">Add gallery image</button>`;
-    if (block.type === 'product') html += `${mediaPicker('Product image', 'image', block.image, { positionPath: 'position' })}${field('Category', `${language}.kicker`, copy.kicker || '')}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}<div class="field-grid">${field('Price or quotation', 'price', block.price || '')}${field('WhatsApp order link', 'link', block.link || '')}</div>${field('Order button text', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
+    if (block.type === 'product') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Size', `${language}.kicker`, copy.kicker || '')}${field('Price', 'price', block.price || '')}`;
+    if (block.type === 'payment') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Payment instruction (optional)', `${language}.instruction`, copy.instruction || '')}`;
+    if (block.type === 'stove') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
     if (block.type === 'partner') html += `${mediaPicker('Partner logo', 'image', block.image, { positionPath: 'position' })}${field('Partner name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Website link', `${language}.link`, copy.link || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'testimonial') html += `${mediaPicker('Customer image', 'image', block.image, { positionPath: 'position' })}${field('Customer name', `${language}.title`, copy.title || '')}${field('Testimonial', `${language}.quote`, copy.quote || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Attribution', `${language}.attribution`, copy.attribution || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'cta') html += `${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
@@ -818,7 +840,9 @@
     if (block.type === 'text') return `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     if (block.type === 'image') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Caption', `${language}.caption`, copy.caption || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     if (block.type === 'imageText') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${selectField('Image alignment', 'layout', block.layout || 'left', { choices: ['left', 'right'] })}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
-    if (block.type === 'product') return `${pendingMediaPicker('Product image', 'image', block.image, { positionPath: 'position' })}${field('Category', `${language}.kicker`, copy.kicker || '')}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}<div class="field-grid">${field('Price or quotation', 'price', block.price || '')}${field('WhatsApp order link', 'link', block.link || '')}</div>${field('Order button text', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
+    if (block.type === 'product') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Size', `${language}.kicker`, copy.kicker || '')}${field('Price', 'price', block.price || '')}`;
+    if (block.type === 'payment') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Payment instruction (optional)', `${language}.instruction`, copy.instruction || '')}`;
+    if (block.type === 'stove') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
     if (block.type === 'partner') return `${pendingMediaPicker('Partner logo', 'image', block.image, { positionPath: 'position' })}${field('Partner name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Website link', `${language}.link`, copy.link || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'testimonial') return `${pendingMediaPicker('Customer image', 'image', block.image, { positionPath: 'position' })}${field('Customer name', `${language}.title`, copy.title || '')}${field('Testimonial', `${language}.quote`, copy.quote || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Attribution', `${language}.attribution`, copy.attribution || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'cta') return `${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
@@ -840,48 +864,38 @@
   }
 
   function ensureAddContentPanel() {
-    if ($('#add-content-form-view')) return;
-    const grid = $('.add-content-grid');
-    if (!grid) return;
-    grid.insertAdjacentHTML('afterend', '<section id="add-content-form-view" class="add-content-form-view" hidden><div class="add-content-form-heading"><span class="admin-kicker">CONTENT DETAILS</span><strong id="add-content-type-label"></strong><small>Complete this block, then add it to the selected section draft.</small></div><form id="add-content-form"><div id="add-content-fields"></div><div class="add-content-form-actions"><button type="button" class="admin-button button-quiet" data-action="change-content-type">Change type</button><div><button type="button" class="admin-button button-outline" data-action="close-add-content">Cancel</button><button type="submit" class="admin-button button-green" data-action="commit-add-content">Add to Section</button></div></div></form></section>');
-    $('#add-content-form').addEventListener('input', (event) => {
+    const form = $('#add-content-form');
+    if (!form || form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+    form.addEventListener('input', (event) => {
       const formatTarget = event.target.closest('[data-format-path][data-format-key]');
       if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatTarget.value); return; }
       const target = event.target.closest('[data-path]');
       if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
     });
-    $('#add-content-form').addEventListener('change', (event) => {
+    form.addEventListener('change', (event) => {
       const formatTarget = event.target.closest('[data-format-path][data-format-key]');
       if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatTarget.value); return; }
       const target = event.target.closest('[data-path]');
       if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
     });
-    $('#add-content-form').addEventListener('submit', (event) => { event.preventDefault(); void commitAddContent(); });
+    form.addEventListener('submit', (event) => { event.preventDefault(); void commitAddContent(); });
   }
 
   function renderAddContentModalForm() {
     ensureAddContentPanel();
-    const grid = $('.add-content-grid');
-    const view = $('#add-content-form-view');
-    if (!grid || !view) return;
-    grid.hidden = Boolean(addContentDraft);
-    view.hidden = !addContentDraft;
     if (!addContentDraft) return;
-    const labels = { text: 'Text, heading and description', image: 'Image with title', imageText: 'Image + text side by side', product: 'Product card', cards: 'Multiple product cards', gallery: 'Image gallery', partner: 'Partner logo and description', testimonial: 'Customer testimonial', cta: 'Call to action' };
-    $('#add-content-type-label').textContent = labels[addContentDraft.block.type] || 'Content block';
+    const meta = sectionMeta.find(([id]) => id === addContentDraft.section);
+    $('#add-content-type-label').textContent = `Add content to ${meta?.[1] || 'this section'}`;
     $('#add-content-fields').innerHTML = renderPendingBlockFields(addContentDraft.block);
-  }
-
-  function startAddContent(type) {
-    addContentDraft = { section: pendingContentSection, block: newDynamicBlock(type) };
-    renderAddContentModalForm();
   }
 
   async function commitAddContent() {
     if (!addContentDraft) return;
     const { section, block } = addContentDraft;
+    if (!block.image && ['product', 'payment', 'stove', 'partner'].includes(block.type)) { showToast('Choose an image before saving.'); return; }
     block.anchor = section || null;
-    block.placement = $('#add-content-placement')?.value || 'inside';
+    block.placement = 'after';
     dynamicBlocks(currentPageContent()).push(block);
     activeSection = `block:${block.id}`;
     addContentDraft = null;
@@ -892,27 +906,16 @@
     draftChangeVersion += 1;
     clearTimeout(draftSaveTimer);
     const saved = await saveDraftRemote(true);
-    if (saved) showToast('Content added to the selected section draft. Publish when ready.');
+    if (saved) showToast('Content saved to the selected section draft. Publish when ready.');
     else showToast('Content was added locally, but the draft could not be saved. Try Save Draft again.');
   }
 
   function dynamicBlockRow(block, index) {
     const copy = blockCopyForEditor(block, language);
-    const label = copy.heading || copy.title || ({ text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Multiple product cards', gallery: 'Image gallery', product: 'Product card', partner: 'Partner entry', testimonial: 'Customer testimonial', cta: 'Call to action' }[block.type] || 'Content block');
+    const label = copy.heading || copy.title || ({ text: 'Added text', image: 'Added image', imageText: 'Added image and text', cards: 'Added products', gallery: 'Added gallery', product: 'Added briquette', payment: 'Added payment content', stove: 'Added stove', partner: 'Added partner', testimonial: 'Added customer testimonial', cta: 'Added call to action' }[block.type] || 'Added content');
     return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Visible'} · ${block.type}</small></div><div class="section-row-actions"><button class="section-action" data-action="edit-section" data-section="block:${escapeHtml(block.id)}">Edit</button><button class="section-action" data-action="move-block-up" data-block-id="${escapeHtml(block.id)}" ${index === 0 ? 'disabled' : ''}>↑</button><button class="section-action" data-action="move-block-down" data-block-id="${escapeHtml(block.id)}" ${index === dynamicBlocks().length - 1 ? 'disabled' : ''}>↓</button></div></div>`;
   }
 
-  function closeAddContent() { $('#add-content-backdrop').hidden = true; $('#add-content-modal').hidden = true; }
-  function openAddContent() { $('#add-content-backdrop').hidden = false; $('#add-content-modal').hidden = false; }
-  function addDynamicBlock(type) {
-    const block = newDynamicBlock(type);
-    dynamicBlocks().push(block);
-    activeSection = `block:${block.id}`;
-    closeAddContent();
-    renderSectionList();
-    renderDynamicBlockForm();
-    persistDraft(false);
-  }
   function moveDynamicBlock(id, delta) {
     const blocks = dynamicBlocks();
     const index = blocks.findIndex((block) => block.id === id);
@@ -924,7 +927,7 @@
   }
   function toggleDynamicBlock(id) { const block = dynamicBlocks().find((item) => item.id === id); if (!block) return; block.visible = block.visible === false; renderSectionList(); renderDynamicBlockForm(false); persistDraft(false); }
   function deleteDynamicBlock(id) {
-    if (!window.confirm('Delete this draft content block? It will disappear from the public page after you publish.')) return;
+    if (!window.confirm('Delete this added content? It will disappear from the public page after you publish.')) return;
     const blocks = dynamicBlocks();
     const index = blocks.findIndex((block) => block.id === id);
     if (index < 0) return;
@@ -937,10 +940,9 @@
   function moveNested(items, index, delta) { const next = index + delta; if (!Array.isArray(items) || index < 0 || next < 0 || next >= items.length) return; [items[index], items[next]] = [items[next], items[index]]; }
 
   function sectionActionButtons(id, isDynamic = false) {
-    const hidden = isDynamic ? dynamicBlockForSection(id)?.visible === false : sectionIsHidden(id);
-    const actualIndex = isDynamic ? dynamicBlocks().findIndex((block) => `block:${block.id}` === id) : -1;
-    const overflowActions = `<button class="section-overflow-item" data-action="move-section-up" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex <= 0 ? 'disabled' : ''}>Move up</button><button class="section-overflow-item" data-action="move-section-down" data-section="${escapeHtml(id)}" ${isDynamic && actualIndex === dynamicBlocks().length - 1 ? 'disabled' : ''}>Move down</button><button class="section-overflow-item" data-action="toggle-section" data-section="${escapeHtml(id)}">${hidden ? 'Show section' : 'Hide section'}</button>${isDynamic ? `<button class="section-overflow-item danger" data-action="delete-block" data-block-id="${escapeHtml(id.slice(6))}">Delete</button>` : ''}`;
-    return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button><button class="section-action add-content-action" data-action="open-add-content" data-section="${escapeHtml(id)}">Add Content</button><div class="section-overflow-wrap"><button class="section-action section-overflow-button" data-action="toggle-section-menu" aria-expanded="false" aria-label="More section actions">•••</button><div class="section-overflow-menu" hidden>${overflowActions}</div></div></div>`;
+    if (isDynamic) return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button></div>`;
+    const addButton = canAddContent(id) ? `<button class="section-action add-content-action" data-action="open-add-content" data-section="${escapeHtml(id)}">Add Content</button>` : '';
+    return `<div class="section-row-actions"><button class="section-action primary-section-action" data-action="edit-section" data-section="${escapeHtml(id)}">Edit</button>${addButton}</div>`;
   }
 
   function staticSectionRow(id, label, description, index) {
@@ -951,14 +953,13 @@
 
   function dynamicBlockRow(block, index) {
     const copy = blockCopyForEditor(block, language);
-    const actualIndex = dynamicBlocks().indexOf(block);
-    const label = copy.heading || copy.title || ({ text: 'Text block', image: 'Image block', imageText: 'Image + text block', cards: 'Card collection', gallery: 'Gallery' }[block.type] || 'Content block');
-    const placement = block.anchor ? `${block.placement || 'after'} · ${block.anchor.replace(/^block:/, '')}` : 'End of page';
-    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Visible'} · ${block.type} · ${escapeHtml(placement)}</small></div>${sectionActionButtons(`block:${block.id}`, true)}</div>`;
+    const label = copy.heading || copy.title || ({ text: 'Added text', image: 'Added image', imageText: 'Added image and text', cards: 'Added products', gallery: 'Added gallery', product: 'Added briquette', payment: 'Added payment content', stove: 'Added stove', partner: 'Added partner', testimonial: 'Added customer testimonial', cta: 'Added call to action' }[block.type] || 'Added content');
+    return `<div class="section-row dynamic-section-row ${`block:${block.id}` === activeSection ? 'active' : ''} ${block.visible === false ? 'is-hidden' : ''}" data-section="block:${escapeHtml(block.id)}"><span class="section-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(label)}${sectionIsDirty(`block:${block.id}`) ? ' <span class="section-image-dot"></span>' : ''}</strong><small>${block.visible === false ? 'Hidden' : 'Added content'}</small></div>${sectionActionButtons(`block:${block.id}`, true)}</div>`;
   }
 
   function orderedSectionRows(entries, content) {
-    if (Array.isArray(content?.sectionOrder) && content.sectionOrder.length) {
+    const isHomeSectionList = entries.some((entry) => ['hero', 'payment', 'testimonial'].includes(entry.id));
+    if (!isHomeSectionList && Array.isArray(content?.sectionOrder) && content.sectionOrder.length) {
       const byId = new Map(entries.map((entry) => [entry.id, entry]));
       const ordered = content.sectionOrder.map((id) => byId.get(id)).filter(Boolean);
       entries = ordered.concat(entries.filter((entry) => !content.sectionOrder.includes(entry.id)));
@@ -987,20 +988,18 @@
     $('#add-content-backdrop').hidden = true;
     $('#add-content-modal').hidden = true;
     addContentDraft = null;
-    const grid = $('.add-content-grid');
-    const view = $('#add-content-form-view');
-    if (grid) grid.hidden = false;
-    if (view) view.hidden = true;
   }
   function openAddContent(section = activeSection) {
+    if (!canAddContent(section)) return;
     ensureAddContentPanel();
     pendingContentSection = section || activeSection;
-    addContentDraft = null;
+    const type = { products: 'product', payment: 'payment', cookstoves: 'stove', partners: 'partner' }[pendingContentSection];
+    addContentDraft = { section: pendingContentSection, block: newDynamicBlock(type) };
+    addContentDraft.block.anchor = pendingContentSection;
+    addContentDraft.block.placement = 'after';
     const context = $('#add-content-context');
-    const label = pendingContentSection.startsWith('block:') ? 'the selected content block' : (sectionMeta.find(([id]) => id === pendingContentSection)?.[1] || genericContent().elements.find((element) => (element.group || 'content') === pendingContentSection)?.groupLabel || 'the selected section');
-    if (context) context.textContent = `New content will be attached to ${label}. Choose a block type, complete its details, then add it to this section.`;
-    const placement = $('#add-content-placement');
-    if (placement) placement.value = 'inside';
+    const label = sectionMeta.find(([id]) => id === pendingContentSection)?.[1] || 'the selected section';
+    if (context) context.textContent = `Complete the fields below, then save this item to ${label}.`;
     renderAddContentModalForm();
     $('#add-content-backdrop').hidden = false;
     $('#add-content-modal').hidden = false;
@@ -1048,8 +1047,9 @@
     $('#drawer-title').textContent = meta[1];
     $('#drawer-description').textContent = meta[2];
     $('#drawer-language').textContent = language === 'sw' ? 'Kiswahili' : 'English';
-    const section = state.draft[activeSection];
-    const forms = { hero: renderHero, trust: renderTrust, products: renderProducts, ordering: renderOrdering, factory: renderFactory, kitchen: renderKitchen, cookstoves: renderCookstoves, impact: renderImpact, partners: renderPartners, images: renderImages, footer: renderFooter };
+    const source = homeSectionSource(activeSection);
+    const section = state.draft[source];
+    const forms = { hero: renderHero, trust: renderTrust, products: renderProducts, ordering: renderOrdering, payment: renderPayment, factory: renderFactory, kitchen: renderKitchen, testimonial: renderTestimonial, cookstoves: renderCookstoves, impact: renderImpact, partners: renderPartners, images: renderImages, footer: renderFooter };
     $('#section-form').innerHTML = forms[activeSection](section);
     if (open) {
       drawer.setAttribute('aria-hidden', 'false');
@@ -1348,12 +1348,10 @@
       if (menu) { menu.hidden = !menu.hidden; target.setAttribute('aria-expanded', String(!menu.hidden)); }
       return;
     }
-    if (action === 'change-content-type') { addContentDraft = null; renderAddContentModalForm(); return; }
     if (action === 'move-section-up') { moveSection(target.dataset.section, -1); return; }
     if (action === 'move-section-down') { moveSection(target.dataset.section, 1); return; }
     if (action === 'toggle-section') { toggleSection(target.dataset.section); return; }
     if (action === 'close-add-content') { closeAddContent(); return; }
-    if (action === 'add-block') { startAddContent(target.dataset.blockType); return; }
     if (action === 'move-block-up') { moveDynamicBlock(target.dataset.blockId, -1); return; }
     if (action === 'move-block-down') { moveDynamicBlock(target.dataset.blockId, 1); return; }
     if (action === 'toggle-block') { toggleDynamicBlock(target.dataset.blockId); return; }

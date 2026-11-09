@@ -865,6 +865,11 @@ const setupMobileReadMore = () => {
     const description = card.querySelector('p:not(.card-kicker)');
     if (description && !card.dataset.mobileReadCard) addMobileReadToggle(card, description);
   });
+  const catalogueCopy = document.querySelector('.catalogue-copy');
+  const catalogueList = catalogueCopy?.querySelector('ul');
+  if (catalogueCopy && catalogueList && !catalogueCopy.dataset.mobileReadCard) {
+    addMobileReadToggle(catalogueCopy, catalogueList);
+  }
 };
 setupMobileReadMore();
 document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));

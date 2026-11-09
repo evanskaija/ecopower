@@ -997,3 +997,43 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .home-impact-stats strong { font-size: 20px; }
   .home-impact-stats span { font-size: 8px; }
 }
+
+/* Products page mobile fit: keep the fuel image, price columns and notes inside the viewport. */
+@media (max-width: 560px) {
+  .catalogue-intro { gap: 0; }
+  .catalogue-image { width: 100%; height: 240px; min-height: 0; border-radius: 20px; background: var(--white); object-fit: contain; }
+  .catalogue-copy { min-width: 0; padding: 25px 0 0; }
+  .catalogue-copy h2 { max-width: 100%; font-size: clamp(31px, 9vw, 40px); line-height: 1.02; overflow-wrap: anywhere; }
+  .catalogue-copy > p:not(.eyebrow) { margin-bottom: 0; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  .catalogue-copy .data-table { display: table; width: 100%; max-width: 100%; margin-top: 20px; table-layout: fixed; overflow: visible; white-space: normal; font-size: 12px; }
+  .catalogue-copy .data-table th,
+  .catalogue-copy .data-table td { padding: 11px 8px; vertical-align: top; overflow-wrap: anywhere; word-break: normal; }
+  .catalogue-copy .data-table th:nth-child(1),
+  .catalogue-copy .data-table td:nth-child(1) { width: 25%; }
+  .catalogue-copy .data-table th:nth-child(2),
+  .catalogue-copy .data-table td:nth-child(2) { width: 47%; }
+  .catalogue-copy .data-table th:nth-child(3),
+  .catalogue-copy .data-table td:nth-child(3) { width: 28%; }
+  .catalogue-copy .data-table th { font-size: 10px; letter-spacing: .05em; }
+  .catalogue-copy .data-table td strong { font-size: 12px; }
+  .catalogue-copy .data-table td:nth-child(3) strong { white-space: nowrap; font-size: 11px; letter-spacing: -.02em; }
+  .catalogue-copy > ul[data-mobile-read-content] { max-height: 5.4em; margin-top: 18px; overflow: hidden; transition: max-height .2s ease; }
+  .catalogue-copy.is-expanded > ul[data-mobile-read-content] { max-height: 30rem; }
+  .catalogue-copy > ul[data-mobile-read-content] li { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+  .catalogue-copy .mobile-read-toggle { display: inline-flex; align-self: flex-start; margin: 0 0 14px; padding: 0; border: 0; background: transparent; color: var(--fresh); font-size: 11px; font-weight: 900; text-decoration: underline; text-underline-offset: 3px; }
+  .catalogue-copy > .button { width: 100%; max-width: 100%; justify-content: center; }
+}
+
+@media (max-width: 380px) {
+  .catalogue-image { height: 210px; border-radius: 18px; }
+  .catalogue-copy { padding-top: 21px; }
+  .catalogue-copy h2 { font-size: 30px; }
+  .catalogue-copy > p:not(.eyebrow) { font-size: 13px; }
+  .catalogue-copy .data-table { margin-top: 17px; font-size: 11px; }
+  .catalogue-copy .data-table th,
+  .catalogue-copy .data-table td { padding: 9px 6px; }
+  .catalogue-copy .data-table th { font-size: 9px; }
+  .catalogue-copy .data-table td strong { font-size: 11px; }
+  .catalogue-copy .data-table td:nth-child(3) strong { font-size: 10px; }
+  .catalogue-copy > ul[data-mobile-read-content] li { font-size: 12px; }
+}

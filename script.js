@@ -879,6 +879,16 @@ const setupMobileReadMore = () => {
     const description = card.querySelector('p');
     if (description && !card.dataset.mobileReadCard) addMobileReadToggle(card, description);
   });
+  const partnerBusinessCopy = document.querySelector('.partners-business-panel > div:first-child');
+  const partnerBusinessDescription = partnerBusinessCopy?.querySelector('p:not(.eyebrow)');
+  if (partnerBusinessCopy && partnerBusinessDescription && !partnerBusinessCopy.dataset.mobileReadCard) {
+    addMobileReadToggle(partnerBusinessCopy, partnerBusinessDescription);
+  }
+  const wakalaCard = document.querySelector('.partners-wakala-card');
+  const wakalaDescription = wakalaCard?.querySelector('.wakala-grid + p');
+  if (wakalaCard && wakalaDescription && !wakalaCard.dataset.mobileReadCard) {
+    addMobileReadToggle(wakalaCard, wakalaDescription);
+  }
 };
 setupMobileReadMore();
 document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));

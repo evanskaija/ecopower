@@ -361,6 +361,7 @@
   }
 
   function showLogin(errorMessage = '') {
+    resetTransientModals();
     currentUser = null;
     $('.admin-app').classList.add('is-locked');
     $('#login-screen').hidden = false;
@@ -585,6 +586,32 @@
     const modalOpen = Boolean(document.querySelector('.admin-drawer.open, .admin-modal:not([hidden])'));
     document.body.classList.toggle('modal-open', modalOpen);
   }
+
+  // Modals are transient UI state. Always start the dashboard with them closed,
+  // including when the browser restores a cached page after back/forward navigation.
+  function resetTransientModals() {
+    ['#media-backdrop', '#media-modal', '#add-content-backdrop', '#add-content-modal', '#revision-backdrop', '#revision-modal', '#messages-backdrop', '#messages-modal', '#settings-backdrop', '#settings-modal'].forEach((selector) => {
+      const element = $(selector);
+      if (element) element.hidden = true;
+    });
+    const drawer = $('#editor-drawer');
+    if (drawer) {
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+    }
+    const drawerBackdrop = $('#drawer-backdrop');
+    if (drawerBackdrop) drawerBackdrop.hidden = true;
+    mediaTarget = null;
+    mediaFocusReturn = null;
+    mediaBusy = false;
+    addContentDraft = null;
+    addContentInitialSnapshot = null;
+    editorSession = null;
+    document.body.classList.remove('modal-open');
+  }
+
+  resetTransientModals();
+  window.addEventListener('pageshow', resetTransientModals);
 
   function ensureMediaModalPortal() {
     const backdrop = $('#media-backdrop');
@@ -1548,7 +1575,6 @@
     if (action === 'view-public') window.open(`/${pageMeta[activePage].file}`, '_blank', 'noopener');
     if (action === 'refresh-preview') { $('#preview-frame').src = previewUrl(); }
     if (action === 'dismiss-notice') target.closest('.admin-notice').remove();
-    if (action === 'media-library') { if (activePage === 'home') openMedia('hero', 'image'); else showToast('Open an image field in the page editor to replace it.'); }
     if (action === 'open-revisions') openRevisions();
     if (action === 'close-revisions') closeRevisions();
     if (action === 'restore-revision') { if (window.confirm('Restore this version into the current draft?')) { apiRequest(`/api/pages/${activePage}/restore/${target.dataset.id}`, { method: 'POST', body: JSON.stringify({}) }).then(async (result) => { if (activePage === 'home') applyRemotePage(result); else { const page = await apiRequest(`/api/pages/${activePage}`); await applyGenericRemotePage(activePage, page); } setPreviewMode('draft'); closeRevisions(); renderSectionList(); renderForm(); updatePreview(); showToast('Revision restored to the draft.'); }).catch((error) => showToast(`Restore failed: ${error.message}`)); } }

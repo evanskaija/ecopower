@@ -4,7 +4,7 @@ const translations = {
   en: {
     'nav.home': 'Home', 'nav.products': 'Products & prices', 'nav.about': 'About us', 'nav.team': 'Our team', 'nav.impact': 'Our impact', 'nav.partner': 'Partner with us', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.order': 'Order on WhatsApp',
     'lang.choose': 'Choose language', 'lang.english': 'English', 'lang.swahili': 'Swahili',
-    'common.learn': 'Learn more', 'common.order': 'Order on WhatsApp', 'common.quote': 'Request a quote', 'common.contact': 'Contact the team', 'common.send': 'Send message', 'common.call': 'Call us',
+    'common.learn': 'Learn more', 'common.readMore': 'Read more', 'common.readLess': 'Read less', 'common.order': 'Order on WhatsApp', 'common.quote': 'Request a quote', 'common.contact': 'Contact the team', 'common.send': 'Send message', 'common.call': 'Call us',
     'home.eyebrow': 'CLEAN COOKING FUEL BY ECOPOWER · DAR ES SALAAM', 'home.title': 'Makange — Kwa maisha <em>bora.</em>', 'home.lede': 'Clean cooking fuel, delivered to your door. Briquettes made from char, agro and forest waste at our factory in Kunduchi, brought to your door by our own Toyo tricycles.', 'home.howToPay': 'How to pay', 'home.captionContact': 'Call or WhatsApp', 'home.caption': 'Pay cash on delivery or by Lipa Namba', 'home.explore': 'Explore our products', 'home.price': 'Makange pricing', 'home.priceNote': 'Door delivery from 20 × 50kg sacks · Bulk and monthly orders: ask on WhatsApp', 'home.trustFactory': 'Made in our own factory', 'home.trustFactoryNote': 'Silver Sands, Kunduchi, since 2023', 'home.trustDelivery': 'Next-day delivery', 'home.trustDeliveryNote': 'Within 10 km · order a day before · from 20 bags', 'home.trustPayment': 'Pay any way', 'home.trustPaymentNote': 'Cash, M-Pesa, any network, bank or card', 'home.trustBurn': 'Long, steady burn', 'home.trustBurnNote': 'Up to 6 hours, tested by TIRDO', 'home.productsEyebrow': 'Products & prices', 'home.productsTitle': 'Makange briquettes', 'home.productsText': 'Made from char dust, agro and forest waste mixed with a binder, pressed by machine and sun-dried.', 'home.monthlyTitle': 'Regular monthly orders', 'home.monthlyText': 'A fixed number of bags delivered through the month, paid on delivery. Already working for chips sellers in Kinondoni.', 'home.businessQuote': 'Get a business quote', 'home.howEyebrow': 'Simple ordering', 'home.howTitle': 'Order in <em>three steps.</em>', 'home.howText': 'Tell us what you need, choose your payment method, and our delivery crew will bring it to you.', 'home.step1': 'Call or WhatsApp', 'home.step1Text': 'Tell us the sack size, how many you need, and where.', 'home.step2': 'Pay your way', 'home.step2Text': 'Use Lipa Namba now, or pay cash when it arrives.', 'home.step3': 'Delivered next day', 'home.step3Text': 'Our Toyo crew delivers within 10 km. For smaller orders, visit a WAKALA shop.', 'home.paymentTitle': 'Pay by Lipa Namba from any network or bank', 'home.paymentText': 'Send the payment message to WhatsApp after paying so we can confirm your order.', 'home.factoryEyebrow': 'From our factory', 'home.factoryTitle': 'A working plant in Kunduchi, with its own delivery fleet', 'home.factoryText': 'EcoPower Solutions Limited started in 2023. We make Makange briquettes at our factory on Old Bagamoyo Road, Silver Sands, Kunduchi, using tailor-made machines that meet industry standards and give a premium output. Our cargo tricycles deliver to homes, food sellers and institutions across Dar es Salaam, together with our WAKALA partners and sales agents.', 'home.aboutMore': 'More about EcoPower', 'home.usersEyebrow': 'Who cooks with Makange', 'home.usersTitle': 'Built for real kitchens.', 'home.impactEyebrow': 'Our impact', 'home.impactTitle': 'Cleaner cooking with <em>measurable change.</em>', 'home.impactText': 'Our full-production estimates show the potential for waste recovery, local livelihoods and lower everyday cooking costs.', 'home.ctaTitle': 'Ready to cook <em>smarter?</em>', 'home.ctaText': 'Order Makange or contact the team for a business supply quotation.',
     'products.heroTitle': 'Better cooking starts with the <em>right fuel.</em>', 'products.heroText': 'Choose the Makange sack size and cookstove that fits your home, business or institution.', 'products.fuelTitle': 'Makange briquettes', 'products.fuelText': 'Made from charcoal dust, agricultural and forest waste mixed with a binder, machine-pressed and sun-dried.', 'products.lightTitle': 'How to light Makange', 'products.lightText': 'Four simple steps to get a steady cooking fire.', 'products.stovesTitle': 'Cookstoves', 'products.stovesText': 'Choose the stove for the way you cook.', 'products.bundleTitle': 'Starter bundle: household stove + 25 kg Makange', 'products.bundleText': 'A practical way to begin cleaner cooking at home.',
     'about.heroTitle': 'From local innovation to <em>cleaner kitchens.</em>', 'about.heroText': 'EcoPower Solutions Limited is a Tanzanian clean-energy manufacturer operating from Kunduchi since 2023.', 'about.whoTitle': 'Who we are', 'about.storyTitle': 'Our story so far', 'about.madeTitle': 'How Makange is made', 'about.mission': 'Our mission', 'about.vision': 'Our vision',
@@ -17,7 +17,7 @@ const translations = {
   sw: {
     'nav.home': 'Nyumbani', 'nav.products': 'Bidhaa na bei', 'nav.about': 'Kuhusu sisi', 'nav.team': 'Timu yetu', 'nav.impact': 'Matokeo yetu', 'nav.partner': 'Shirikiana nasi', 'nav.faq': 'Maswali', 'nav.contact': 'Wasiliana nasi', 'nav.order': 'Agiza WhatsApp',
     'lang.choose': 'Chagua lugha', 'lang.english': 'Kiingereza', 'lang.swahili': 'Kiswahili',
-    'common.learn': 'Jifunze zaidi', 'common.order': 'Agiza WhatsApp', 'common.quote': 'Omba bei ya biashara', 'common.contact': 'Wasiliana na timu', 'common.send': 'Tuma ujumbe', 'common.call': 'Piga simu',
+    'common.learn': 'Jifunze zaidi', 'common.readMore': 'Soma zaidi', 'common.readLess': 'Soma kidogo', 'common.order': 'Agiza WhatsApp', 'common.quote': 'Omba bei ya biashara', 'common.contact': 'Wasiliana na timu', 'common.send': 'Tuma ujumbe', 'common.call': 'Piga simu',
     'home.eyebrow': 'MAFUTA SAFI YA KUPIKIA YA ECOPOWER · DAR ES SALAAM', 'home.title': 'Makange — Kwa maisha <em>bora.</em>', 'home.lede': 'Nishati safi ya kupikia, ikiletwa mlangoni kwako. Briquettes zinazotengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu katika kiwanda chetu Kunduchi, kisha kuletwa kwako na Toyo zetu.', 'home.howToPay': 'Jinsi ya kulipa', 'home.captionContact': 'Piga simu au WhatsApp', 'home.caption': 'Lipa taslimu unapopokea au kwa Lipa Namba', 'home.explore': 'Tazama bidhaa zetu', 'home.price': 'Bei za Makange', 'home.priceNote': 'Delivery mlangoni kutoka magunia 20 ya 50kg · Maagizo ya jumla na kila mwezi: uliza WhatsApp', 'home.trustFactory': 'Inatengenezwa kiwandani kwetu', 'home.trustFactoryNote': 'Silver Sands, Kunduchi, tangu 2023', 'home.trustDelivery': 'Tunaleta kesho yake', 'home.trustDeliveryNote': 'Ndani ya km 10 · agiza siku moja kabla · kuanzia magunia 20', 'home.trustPayment': 'Lipa unavyotaka', 'home.trustPaymentNote': 'Taslimu, M-Pesa, mtandao wowote, benki au kadi', 'home.trustBurn': 'Inawaka muda mrefu, kwa utulivu', 'home.trustBurnNote': 'Hadi saa 6, imepimwa na TIRDO', 'home.productsEyebrow': 'Bidhaa na bei', 'home.productsTitle': 'Briquettes za Makange', 'home.productsText': 'Zimetengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu zilizochanganywa na binder, zikabonyezwa kwa mashine na kukaushwa juani.', 'home.monthlyTitle': 'Maagizo ya kila mwezi', 'home.monthlyText': 'Idadi maalum ya magunia inapelekwa kwa mwezi na inalipwa wakati wa delivery. Tayari inawasaidia wauza chips Kinondoni.', 'home.businessQuote': 'Pata bei ya biashara', 'home.howEyebrow': 'Kuagiza kwa urahisi', 'home.howTitle': 'Agiza kwa <em>hatua tatu.</em>', 'home.howText': 'Tuambie unachohitaji, chagua njia ya malipo, na timu yetu italeta bidhaa kwako.', 'home.step1': 'Piga simu au WhatsApp', 'home.step1Text': 'Tuambie ukubwa wa gunia, idadi na eneo lako.', 'home.step2': 'Lipa kwa njia yako', 'home.step2Text': 'Tumia Lipa Namba sasa au lipa cash wakati bidhaa inafika.', 'home.step3': 'Delivery siku inayofuata', 'home.step3Text': 'Toyo yetu inaleta bidhaa ndani ya km 10. Kwa agizo dogo, tembelea WAKALA.', 'home.paymentTitle': 'Lipa Namba kutoka mtandao au benki yoyote', 'home.paymentText': 'Tuma ujumbe wa malipo WhatsApp baada ya kulipa ili tuthibitishe oda yako.', 'home.factoryEyebrow': 'Kutoka kiwandani kwetu', 'home.factoryTitle': 'Kiwanda kinachofanya kazi Kunduchi, chenye delivery yake', 'home.factoryText': 'EcoPower Solutions Limited ilianza mwaka 2023. Tunatengeneza briquettes za Makange katika kiwanda chetu Old Bagamoyo Road, Silver Sands, Kunduchi, kwa kutumia mashine maalum zinazokidhi viwango vya sekta na kutoa bidhaa bora. Tricycles zetu husafirisha kwa nyumba, wauza chakula na taasisi Dar es Salaam, pamoja na washirika wetu WAKALA na mawakala wa mauzo.', 'home.aboutMore': 'Zaidi kuhusu EcoPower', 'home.usersEyebrow': 'Nani anapika kwa Makange', 'home.usersTitle': 'Imetengenezwa kwa jikoni halisi.', 'home.impactEyebrow': 'Matokeo yetu', 'home.impactTitle': 'Upishi safi wenye <em>mabadiliko yanayopimika.</em>', 'home.impactText': 'Makadirio ya uzalishaji kamili yanaonyesha uwezo wa kubadilisha taka, kutengeneza ajira na kupunguza gharama za kupika kila siku.', 'home.ctaTitle': 'Uko tayari kupika <em>kwa werevu?</em>', 'home.ctaText': 'Agiza Makange au wasiliana na timu kwa bei ya supply ya biashara.',
     'products.heroTitle': 'Upishi bora huanza na <em>mafuta sahihi.</em>', 'products.heroText': 'Chagua ukubwa wa gunia la Makange na jiko linalofaa nyumba, biashara au taasisi yako.', 'products.fuelTitle': 'Briquettes za Makange', 'products.fuelText': 'Imetengenezwa kwa mabaki ya mkaa, taka za kilimo na misitu, binder, machine pressing na kukaushwa juani.', 'products.lightTitle': 'Jinsi ya kuwasha Makange', 'products.lightText': 'Hatua nne rahisi kupata moto wa kupikia ulio thabiti.', 'products.stovesTitle': 'Majiko', 'products.stovesText': 'Chagua jiko kulingana na namna unavyopika.', 'products.bundleTitle': 'Kifurushi cha kuanzia: jiko la nyumbani + Makange kilo 25', 'products.bundleText': 'Njia rahisi kuanza upishi safi nyumbani.',
     'about.heroTitle': 'Kutoka ubunifu wa hapa hadi <em>jikoni safi.</em>', 'about.heroText': 'EcoPower Solutions Limited ni mtengenezaji wa nishati safi Tanzania anayefanya kazi Kunduchi tangu 2023.', 'about.whoTitle': 'Sisi ni nani', 'about.storyTitle': 'Hadithi yetu', 'about.madeTitle': 'Jinsi Makange inavyotengenezwa', 'about.mission': 'Dhamira yetu', 'about.vision': 'Maono yetu',
@@ -827,6 +827,48 @@ window.addEventListener('message', (event) => {
   window.__ecopowerApplyPreview(event.data.content, event.data.language, event.data.version || '');
 });
 
+const updateMobileReadToggleLabel = (button, expanded = button.closest('[data-mobile-read-card]')?.classList.contains('is-expanded')) => {
+  const dictionary = translations[document.documentElement.lang === 'sw' ? 'sw' : 'en'] || translations.en;
+  button.textContent = dictionary[expanded ? 'common.readLess' : 'common.readMore'];
+  button.setAttribute('aria-expanded', String(Boolean(expanded)));
+};
+const syncMobileReadToggleLabels = () => document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));
+const addMobileReadToggle = (card, content) => {
+  if (!card || !content || card.dataset.mobileReadCard) return;
+  card.dataset.mobileReadCard = 'true';
+  content.dataset.mobileReadContent = 'true';
+  const toggle = document.createElement('button');
+  toggle.className = 'mobile-read-toggle';
+  toggle.type = 'button';
+  toggle.dataset.mobileReadToggle = 'true';
+  toggle.addEventListener('click', () => {
+    const expanded = card.classList.toggle('is-expanded');
+    updateMobileReadToggleLabel(toggle, expanded);
+  });
+  content.insertAdjacentElement('afterend', toggle);
+  updateMobileReadToggleLabel(toggle, false);
+};
+const setupMobileReadMore = () => {
+  const businessCard = document.querySelector('#products .note-card');
+  const businessCopy = businessCard?.querySelector(':scope > div');
+  const businessDescription = businessCopy?.querySelector('p:not(.eyebrow)');
+  const businessList = businessCopy?.querySelector('ul');
+  if (businessCard && businessCopy && businessDescription && !businessCopy.querySelector('[data-mobile-read-content]')) {
+    const content = document.createElement('div');
+    content.className = 'mobile-read-content';
+    businessCopy.insertBefore(content, businessDescription);
+    content.append(businessDescription);
+    if (businessList) content.append(businessList);
+    addMobileReadToggle(businessCard, content);
+  }
+  document.querySelectorAll('.home-stove-card').forEach((card) => {
+    const description = card.querySelector('p:not(.card-kicker)');
+    if (description && !card.dataset.mobileReadCard) addMobileReadToggle(card, description);
+  });
+};
+setupMobileReadMore();
+document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));
+
 const setLanguage = (language) => {
   const safeLanguage = language === 'sw' ? 'sw' : 'en';
   localStorage.setItem('ecopower-language', safeLanguage);
@@ -841,6 +883,7 @@ const setLanguage = (language) => {
   if (currentFlag) currentFlag.alt = safeLanguage === 'sw' ? 'Swahili' : 'English';
   languageToggle?.setAttribute('aria-label', safeLanguage === 'sw' ? 'Language: Swahili. Choose language' : 'Language: English. Choose language');
   document.querySelectorAll('.language-menu button[data-language]').forEach((button) => button.classList.toggle('selected', button.dataset.language === safeLanguage));
+  syncMobileReadToggleLabels();
 };
 
 const languageToggle = document.querySelector('.language-switcher');

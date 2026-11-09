@@ -604,6 +604,11 @@
     return JSON.stringify(normalizeMediaForCompare(addContentDraft.block)) !== JSON.stringify(normalizeMediaForCompare(addContentInitialSnapshot));
   }
 
+  function hasUnsavedMediaForm() {
+    if (!mediaTarget) return false;
+    return Boolean($('#media-upload')?.files?.length || $('#media-url')?.value.trim() || $('#media-alt-text')?.value.trim() || $('#media-caption')?.value.trim() || $('#media-description')?.value.trim());
+  }
+
   function confirmCloseEditor() {
     if (!hasUnsavedEditorChanges()) return true;
     return window.confirm('You have unsaved editor changes. Close this editor and keep them in the current draft?');
@@ -1041,7 +1046,7 @@
   }
   function openAddContent(section = activeSection) {
     if (!canAddContent(section)) return;
-    if (!closeAddContent() || !closeDrawer()) return;
+    if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     ensureAddContentPanel();
     pendingContentSection = section || activeSection;
     const type = { products: 'product', payment: 'payment', cookstoves: 'stove', partners: 'partner' }[pendingContentSection];
@@ -1224,11 +1229,14 @@
     syncModalScrollLock();
   }
 
-  function closeMedia() {
+  function closeMedia({ force = false } = {}) {
+    if (!force && mediaBusy) { showToast('Please wait for the image operation to finish.'); return false; }
+    if (!force && hasUnsavedMediaForm() && !window.confirm('The media form has unsaved information. Close it and discard those values?')) return false;
     $('#media-backdrop').hidden = true;
     $('#media-modal').hidden = true;
     mediaTarget = null;
     syncModalScrollLock();
+    return true;
   }
 
   function openRevisions() {
@@ -1478,7 +1486,7 @@
       const selectedSrc = target.dataset.src;
       setAt(contentForSection(targetSection), targetPath, selectedSrc);
       draftChangeVersion += 1;
-      closeMedia();
+      closeMedia({ force: true });
       updateMediaPicker(targetPath, selectedSrc, targetSection);
       if (targetSection === '__new-content__') { renderAddContentModalForm(); showToast('Image selected for the new content block.'); return; }
       updatePreview();
@@ -1536,7 +1544,7 @@
     draftChangeVersion += 1;
     updateMediaPicker(targetPath, item.src, targetSection);
     if (targetSection === '__new-content__') {
-      closeMedia();
+      closeMedia({ force: true });
       renderAddContentModalForm();
       showToast('Image uploaded and attached to the new content block.');
       return;
@@ -1544,7 +1552,7 @@
     updatePreview();
     const saved = await saveDraftRemote(true);
     if (saved) {
-      closeMedia();
+      closeMedia({ force: true });
       showToast(successMessage);
     } else {
       setMediaStatus('The image is stored, but the page draft could not be saved. Keep this modal open and try Save draft again.', 'error');

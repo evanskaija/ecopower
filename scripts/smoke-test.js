@@ -29,6 +29,7 @@ async function main() {
   assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
   assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
+  assert.match(adminSource, /if \(!closeMedia\(\) \|\| !closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'Add Content should close the Media Library before opening');
   assert.match(adminSource, /if \(type === 'stove'\) \{ block\.image = ''; /, 'new stoves should start without a selected image');
   assert.match(adminSource, /format-advanced/, 'advanced text formatting should be expandable');
   for (const section of ['products', 'payment', 'cookstoves', 'partners']) assert.match(adminSource, new RegExp(`canAddContent\\(section\\)|${section}`), `${section} should remain an Add Content section`);

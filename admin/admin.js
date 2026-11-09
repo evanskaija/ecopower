@@ -612,7 +612,7 @@
     addContentDraft = null;
     addContentInitialSnapshot = null;
     editorSession = null;
-    document.body.classList.remove('modal-open');
+    document.body.classList.remove('modal-open', 'media-picker-open');
   }
 
   resetTransientModals();
@@ -1239,7 +1239,7 @@
       node.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (type === 'image') openMedia(section, pathTemplate?.replace('INDEX', String(index)) || 'image');
+        if (type === 'image') openMedia(section, pathTemplate?.replace('INDEX', String(index)) || 'image', { intentional: true });
         else { activeSection = section; renderSectionList(); renderForm(); }
       }, { once: true });
     }));
@@ -1269,10 +1269,10 @@
     $('#media-grid').innerHTML = state.media.map((item) => `<button class="media-card" data-action="select-media" data-src="${escapeHtml(item.src)}"><img src="${assetUrl(item.src)}" alt="" /><strong>${escapeHtml(item.name)}</strong><small>${mediaAssignment(item.src) || (item.uploaded ? 'Uploaded asset' : 'Existing website asset')}</small></button>`).join('');
   }
 
-  function openMedia(section, path) {
+  function openMedia(section, path, { intentional = false } = {}) {
     // The Media Library belongs to page editors only. A stale click, restored
     // DOM state, or legacy dashboard action must never open it on the overview.
-    if (isDashboard || $('#page-editor-view')?.hidden) return;
+    if (!intentional || isDashboard || $('#page-editor-view')?.hidden) return;
     ensureMediaModalPortal();
     mediaFocusReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     mediaTarget = { section, path };
@@ -1285,6 +1285,7 @@
     setMediaStatus('');
     setMediaBusy(false);
     renderMedia();
+    document.body.classList.add('media-picker-open');
     $('#media-backdrop').hidden = false;
     $('#media-modal').hidden = false;
     syncModalScrollLock();
@@ -1296,6 +1297,7 @@
     if (!force && hasUnsavedMediaForm() && !window.confirm('The media form has unsaved information. Close it and discard those values?')) return false;
     $('#media-backdrop').hidden = true;
     $('#media-modal').hidden = true;
+    document.body.classList.remove('media-picker-open');
     mediaTarget = null;
     syncModalScrollLock();
     const focusTarget = mediaFocusReturn;
@@ -1561,8 +1563,8 @@
     if (action === 'save-draft') saveDraft();
     if (action === 'publish') publish();
     if (action === 'close-drawer') closeDrawer();
-    if (action === 'drawer-media') { if (activePage === 'home') openMedia(activeSection, 'image'); else showToast('Select an image field below to choose the replacement.'); }
-    if (action === 'media') openMedia(target.dataset.section || activeSection, target.dataset.path);
+    if (action === 'drawer-media') { if (activePage === 'home') openMedia(activeSection, 'image', { intentional: true }); else showToast('Select an image field below to choose the replacement.'); }
+    if (action === 'media') openMedia(target.dataset.section || activeSection, target.dataset.path, { intentional: true });
     if (action === 'close-media') closeMedia();
     if (action === 'select-media' && mediaTarget) {
       const targetSection = mediaTarget.section;

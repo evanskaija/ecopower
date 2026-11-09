@@ -560,7 +560,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .product-grid { grid-template-columns: 1fr 1fr; }
   .note-card { grid-column: 1 / -1; min-height: auto; }
   .note-card .button { align-self: flex-start; }
-  .home-stove-grid { grid-template-columns: 1fr 1fr; }
+  .home-stove-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1040px) {
@@ -569,14 +569,14 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .topbar-inner > span:first-child, .social-links { display: none; }
   .nav-bar { min-height: 74px; }
   .menu-toggle { display: block; margin-left: auto; }
-  .nav-menu { position: absolute; top: calc(100% + 1px); right: 0; left: 0; display: none; align-items: stretch; flex-direction: column; gap: 0; padding: 12px 16px 18px; border-bottom: 1px solid var(--line); background: var(--white); box-shadow: 0 15px 28px rgba(9,43,32,.12); }
+  .nav-menu { position: absolute; top: calc(100% + 1px); right: 0; left: 0; display: none; align-items: stretch; flex-direction: column; gap: 0; max-height: calc(100vh - var(--topbar-height) - var(--nav-height)); overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 18px; border-bottom: 1px solid var(--line); background: var(--white); box-shadow: 0 15px 28px rgba(9,43,32,.12); }
   .nav-menu.open { display: flex; }
   .nav-links { display: grid; gap: 0; }
   .nav-link { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
   .nav-link::after { display: none; }
   .nav-actions { justify-content: space-between; padding-top: 14px; }
   .language-menu { top: calc(100% + 10px); right: 0; bottom: auto; }
-  .hero-grid, .page-hero-grid, .about-layout, .comparison-grid, .partner-layout, .contact-layout { grid-template-columns: 1fr; min-height: auto; }
+  .hero-grid, .page-hero-grid, .about-layout, .comparison-grid, .partner-layout, .contact-layout { grid-template-columns: minmax(0, 1fr); min-height: auto; }
   .hero-copy { padding: 50px 0 27px; }
   .hero-brand-mark { width: 220px; margin-bottom: 21px; }
   .hero-visual { min-height: 420px; }
@@ -612,11 +612,14 @@ h1, h2, h3 { letter-spacing: -.045em; }
 @media (max-width: 560px) {
   :root { --page: calc(100% - 26px); }
   body { font-size: 15px; }
+  .page-width, .hero-grid > *, .page-hero-grid > *, .section-heading > *, .payment-panel-how > * { min-width: 0; }
+  .hero h1, .page-hero h1, .section-heading h2, .about-layout h2, .payment-panel-how h3 { max-width: 100%; overflow-wrap: anywhere; }
   .topbar-links { gap: 10px; }
   .brand-text strong { font-size: 20px; }
   .hero h1, .page-hero h1 { font-size: 43px; letter-spacing: -.06em; }
   .hero-brand-mark { width: 205px; margin-bottom: 18px; }
   .hero-copy > p:not(.eyebrow) { font-size: 14px; }
+  .hero-visual { overflow: hidden; }
   .hero-actions .button { width: 100%; }
   .hero-caption { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
   .hero-visual { min-height: 315px; }
@@ -624,14 +627,14 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .hero-visual > img:not(.hero-photo) { width: min(100%, 320px); max-height: 300px; }
   .price-panel { width: 255px; padding: 11px; }
   .price-panel-grid strong { font-size: 16px; }
-  .trust-strip { grid-template-columns: 1fr 1fr; }
+  .trust-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trust-item { min-height: 77px; padding: 11px 13px; }
   .trust-item:nth-child(2) { border-right: 0; }
   .trust-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .section { padding: 82px 0; }
   .section-tight { padding: 64px 0; }
   .section-heading h2, .about-layout h2 { font-size: 35px; }
-  .product-grid, .step-grid, .impact-dashboard, .people-grid, .contact-cards { grid-template-columns: 1fr; }
+  .product-grid, .step-grid, .impact-dashboard, .people-grid, .contact-cards { grid-template-columns: minmax(0, 1fr); }
   .product-card { min-height: 430px; }
   .product-card-image { width: 100%; height: 100%; margin: 0; padding: 24px; }
   .product-card .card-body { padding: 24px; }
@@ -639,8 +642,8 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .payment-panel-how { gap: 28px; min-height: 0; margin-top: 42px; padding: 23px 21px; }
   .payment-panel-how .payment-row { grid-template-columns: 1fr auto; gap: 5px 10px; }
   .payment-panel-how .payment-row small { grid-column: 1 / -1; }
-  .payment-qr-stack { grid-template-columns: 1fr 1fr; align-items: start; }
-  .payment-qr-card img { width: 132px; height: 168px; }
+  .payment-qr-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .payment-qr-card img { width: 100%; max-width: 132px; height: auto; aspect-ratio: 132 / 168; }
   .story-grid { grid-template-columns: 1fr; }
   .story-image { height: 280px; }
   .factory-collage { grid-template-rows: 190px 110px 110px; }
@@ -655,7 +658,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .lighting-card img { height: 145px; margin-bottom: 10px; }
   .stove-grid, .journey-grid, .form-grid, .partner-services { grid-template-columns: 1fr; }
   .stove-card img { height: 180px; }
-  .home-stove-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .home-stove-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .home-stove-card { padding: 12px; }
   .home-stove-card img { height: 145px; margin-bottom: 11px; }
   .home-stove-card h3 { font-size: 17px; }
@@ -925,4 +928,51 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .home-impact-stats strong { font-size: 23px; white-space: nowrap; }
   .home-impact-stats span { margin-top: 3px; font-size: 9px; line-height: 1.3; overflow-wrap: anywhere; }
   .home-impact-summary > .page-width > p { margin-top: 12px; font-size: 11px; }
+}
+
+/* Extra-narrow phone guardrails for 320–380px Samsung and compact Android screens. */
+@media (max-width: 380px) {
+  :root { --page: calc(100% - 22px); }
+  .topbar-links { gap: 6px; font-size: 10px; }
+  .hero-copy { padding-top: 40px; }
+  .hero-brand-mark { width: 185px; }
+  .hero h1, .page-hero h1 { font-size: 36px; line-height: 1.02; letter-spacing: -.05em; }
+  .hero-copy > p:not(.eyebrow) { font-size: 13px; line-height: 1.55; }
+  .hero-caption { grid-template-columns: 1fr; gap: 4px; margin-top: 22px; }
+  .hero-visual { min-height: 285px; }
+  .hero-photo { height: 255px; }
+  .price-panel { right: 2px; bottom: 14px; width: min(232px, calc(100% - 4px)); padding: 9px; }
+  .price-panel-grid { gap: 6px; }
+  .price-panel-grid div { padding: 8px; }
+  .price-panel-grid strong { font-size: 14px; }
+  .price-panel-note { margin-top: 8px; font-size: 10px; }
+  .trust-item { grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; min-height: 75px; padding: 9px 8px; }
+  .trust-icon { width: 20px; height: 20px; }
+  .trust-item strong { font-size: 12px; }
+  .trust-item span { font-size: 10px; }
+  .section { padding: 64px 0; }
+  .section-heading { gap: 12px; margin-bottom: 30px; }
+  .section-heading h2, .about-layout h2 { font-size: 29px; }
+  .section-heading > p { font-size: 14px; line-height: 1.5; }
+  .payment-panel-how { gap: 22px; padding: 18px 14px; }
+  .payment-panel-how .payment-copy h3 { font-size: 27px; }
+  .payment-panel-how .payment-row { gap: 4px 8px; padding: 13px 12px; }
+  .payment-panel-how .payment-row span { font-size: 11px; }
+  .payment-panel-how .payment-row strong { font-size: 20px; }
+  .payment-panel-how .payment-row small { font-size: 9px; }
+  .payment-qr-stack { gap: 8px; }
+  .payment-qr-card img { max-width: 100%; }
+  .home-stove-grid { gap: 7px; }
+  .home-stove-card { padding: 8px; }
+  .home-stove-card img { height: 112px; }
+  .home-stove-card .card-kicker { font-size: 8px; }
+  .home-stove-card h3 { font-size: 15px; }
+  .home-stove-card > p[data-mobile-read-content] { font-size: 10px; }
+  .home-stove-card .mobile-read-toggle { font-size: 9px; }
+  .home-stove-price { font-size: 15px; }
+  .home-stove-card .button { min-height: 36px; font-size: 9px; }
+  .home-impact-summary h2 { font-size: 26px; }
+  .home-impact-stats { gap: 5px; }
+  .home-impact-stats strong { font-size: 20px; }
+  .home-impact-stats span { font-size: 8px; }
 }

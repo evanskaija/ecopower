@@ -388,7 +388,7 @@
 
   async function switchPage(slug, trigger) {
     if (!pageMeta[slug] || (slug === activePage && !isDashboard)) return;
-    if (!closeAddContent() || !closeDrawer()) return;
+    if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     activePage = slug;
     isDashboard = false;
     activeSection = slug === 'home' ? 'hero' : 'generic-text';
@@ -419,7 +419,7 @@
     }
   }
   function showDashboard() {
-    if (!closeAddContent() || !closeDrawer()) return;
+    if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     isDashboard = true;
     $('#dashboard-view').hidden = false;
     $('#page-editor-view').hidden = true;
@@ -1450,7 +1450,7 @@
     }
     const action = target.dataset.action;
     if (action === 'dashboard') { showDashboard(); return; }
-    if (action === 'open-pages') { if (!closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(false); return; }
+    if (action === 'open-pages') { if (!closeMedia() || !closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(false); return; }
     if (action === 'logout') {
       apiRequest('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }).catch(() => {}).finally(() => showLogin('You have been signed out.'));
       return;

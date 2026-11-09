@@ -26,6 +26,8 @@ async function main() {
   assert.equal(adminHtml.includes('Choose a content block'), false, 'Home Add Content should not show the old chooser');
   assert.equal((adminHtml.match(/data-block-type=/g) || []).length, 0, 'Home Add Content should not expose block type buttons');
   assert.equal(adminHtml.includes('add-content-context'), false, 'Add Content should not show repeated introductory copy');
+  assert.equal(adminHtml.includes('data-action="media-library"'), false, 'Dashboard should not expose a standalone Media Library action');
+  assert.equal(adminHtml.includes('Manage Media'), false, 'Dashboard should not expose a Manage Media action');
   assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
   assert.match(adminStyles, /#media-backdrop[^\n]*z-index: 100/, 'Media Library backdrop should sit above Add Content');

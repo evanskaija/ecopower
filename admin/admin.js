@@ -396,6 +396,7 @@
     document.body.classList.remove('dashboard-mode');
     activeSection = slug === 'home' ? 'hero' : 'generic-text';
     $('#dashboard-view').hidden = true;
+    $('#dashboard-reference-view').hidden = true;
     $('#page-editor-view').hidden = false;
     document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'toggle-pages'));
     document.querySelector('.admin-breadcrumb span').textContent = 'Website Pages';
@@ -413,8 +414,13 @@
   }
 
   function updateDashboardMetrics() {
+    const pageCount = Object.keys(pageMeta).length;
     const mediaCount = $('#dashboard-media-count');
     const draftCount = $('#dashboard-draft-count');
+    const referencePageCount = $('#dashboard-ref-page-count');
+    const referenceMediaCount = $('#dashboard-ref-media-count');
+    if (referencePageCount) referencePageCount.textContent = String(pageCount);
+    if (referenceMediaCount) referenceMediaCount.textContent = String(state.media.length);
     if (mediaCount) mediaCount.textContent = String(state.media.length);
     if (draftCount) {
       const records = activePage === 'home' ? state.draftRecords : (genericState()?.draftRecords || {});
@@ -426,7 +432,8 @@
     isDashboard = true;
     document.body.classList.add('dashboard-mode');
     resetTransientModals();
-    $('#dashboard-view').hidden = false;
+    $('#dashboard-view').hidden = true;
+    $('#dashboard-reference-view').hidden = false;
     $('#page-editor-view').hidden = true;
     document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'dashboard'));
     document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.remove('active'));
@@ -438,6 +445,7 @@
     isDashboard = false;
     document.body.classList.remove('dashboard-mode');
     $('#dashboard-view').hidden = true;
+    $('#dashboard-reference-view').hidden = true;
     $('#page-editor-view').hidden = false;
     document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'toggle-pages'));
     document.querySelectorAll('.page-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.page === activePage));
@@ -1486,6 +1494,7 @@
       return;
     }
     const action = target.dataset.action;
+    if (action === 'toggle-sidebar') { document.body.classList.toggle('sidebar-collapsed'); return; }
     if (action === 'dashboard') { showDashboard(); return; }
     if (action === 'open-pages') { if (!closeMedia() || !closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(false); return; }
     if (action === 'logout') {

@@ -875,6 +875,10 @@ const setupMobileReadMore = () => {
   if (crewPanel && crewDescription && !crewPanel.dataset.mobileReadCard) {
     addMobileReadToggle(crewPanel, crewDescription);
   }
+  document.querySelectorAll('.impact-benefit').forEach((card) => {
+    const description = card.querySelector('p');
+    if (description && !card.dataset.mobileReadCard) addMobileReadToggle(card, description);
+  });
 };
 setupMobileReadMore();
 document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));

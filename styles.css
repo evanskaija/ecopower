@@ -1071,3 +1071,50 @@ h1, h2, h3 { letter-spacing: -.045em; }
   body[data-page="team"] .cta p:not(.eyebrow) { font-size: 14px; }
   body[data-page="team"] .cta-actions .button { padding-inline: 11px; font-size: 11px; }
 }
+
+/* Results page mobile fit: keep metrics and the cost comparison readable without horizontal clipping. */
+@media (max-width: 560px) {
+  body[data-page="impact"] .impact-metrics-section { padding-top: 43px; padding-bottom: 46px; }
+  body[data-page="impact"] .impact-metrics-label { margin-bottom: 12px; font-size: 10px; line-height: 1.35; }
+  body[data-page="impact"] .impact-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  body[data-page="impact"] .impact-number { min-width: 0; min-height: 130px; padding: 16px 14px; border-radius: 15px; }
+  body[data-page="impact"] .impact-number strong { font-size: clamp(22px, 7.2vw, 30px); line-height: 1; white-space: nowrap; }
+  body[data-page="impact"] .impact-number span { margin-top: 8px; font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
+  body[data-page="impact"] .impact-number small { margin-top: 7px; font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+  body[data-page="impact"] .comparison-card { padding: 20px 17px; border-radius: 18px; }
+  body[data-page="impact"] .comparison-card h2 { margin-bottom: 8px; font-size: clamp(29px, 8vw, 35px); line-height: 1.04; overflow-wrap: anywhere; }
+  body[data-page="impact"] .comparison-card > p { font-size: 13px; line-height: 1.45; }
+  body[data-page="impact"] .comparison-card .data-table { display: table; width: 100%; max-width: 100%; margin-top: 18px; table-layout: fixed; overflow: visible; white-space: normal; font-size: 11px; }
+  body[data-page="impact"] .comparison-card .data-table th,
+  body[data-page="impact"] .comparison-card .data-table td { padding: 10px 7px; vertical-align: top; overflow-wrap: anywhere; word-break: normal; }
+  body[data-page="impact"] .comparison-card .data-table th:nth-child(1),
+  body[data-page="impact"] .comparison-card .data-table td:nth-child(1) { width: 48%; }
+  body[data-page="impact"] .comparison-card .data-table th:nth-child(2),
+  body[data-page="impact"] .comparison-card .data-table td:nth-child(2) { width: 22%; }
+  body[data-page="impact"] .comparison-card .data-table th:nth-child(3),
+  body[data-page="impact"] .comparison-card .data-table td:nth-child(3) { width: 30%; }
+  body[data-page="impact"] .comparison-card .data-table th { font-size: 9px; letter-spacing: .04em; }
+  body[data-page="impact"] .comparison-card .data-table td strong { font-size: 11px; }
+  body[data-page="impact"] .comparison-card .data-table td small { display: inline-block; font-size: 9px; line-height: 1.3; }
+  body[data-page="impact"] .comparison-card .data-table td:nth-child(3) strong { white-space: nowrap; font-size: 10px; letter-spacing: -.03em; }
+  body[data-page="impact"] .comparison-note { margin-top: 14px; font-size: 12px; line-height: 1.45; }
+  body[data-page="impact"] .impact-benefits { gap: 10px; }
+  body[data-page="impact"] .impact-benefit { padding: 18px; }
+  body[data-page="impact"] .impact-benefit p[data-mobile-read-content] { max-height: 5.1em; margin-bottom: 7px; overflow: hidden; transition: max-height .2s ease; }
+  body[data-page="impact"] .impact-benefit.is-expanded p[data-mobile-read-content] { max-height: 30rem; }
+  body[data-page="impact"] .impact-benefit .mobile-read-toggle { display: inline-flex; margin: 0; padding: 0; border: 0; background: transparent; color: var(--fresh); font-size: 10px; font-weight: 900; text-decoration: underline; text-underline-offset: 3px; }
+}
+
+@media (max-width: 380px) {
+  body[data-page="impact"] .impact-dashboard { gap: 8px; }
+  body[data-page="impact"] .impact-number { min-height: 123px; padding: 14px 11px; }
+  body[data-page="impact"] .impact-number strong { font-size: 22px; }
+  body[data-page="impact"] .impact-number span { font-size: 12px; }
+  body[data-page="impact"] .impact-number small { font-size: 9px; }
+  body[data-page="impact"] .comparison-card { padding: 18px 13px; }
+  body[data-page="impact"] .comparison-card .data-table th,
+  body[data-page="impact"] .comparison-card .data-table td { padding: 9px 5px; }
+  body[data-page="impact"] .comparison-card .data-table th { font-size: 8px; }
+  body[data-page="impact"] .comparison-card .data-table td strong { font-size: 10px; }
+  body[data-page="impact"] .comparison-card .data-table td:nth-child(3) strong { font-size: 9px; }
+}

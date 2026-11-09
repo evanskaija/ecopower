@@ -906,6 +906,41 @@ if (revealImmediately || !('IntersectionObserver' in window)) {
   scrollRevealElements.forEach((element) => revealObserver.observe(element));
 }
 
+const socialProfiles = [
+  {
+    label: 'Instagram',
+    url: 'https://www.instagram.com/ecopower_solutions_ltd',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="4.25" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="17.4" cy="6.6" r="1.2" fill="currentColor" /></svg>'
+  },
+  {
+    label: 'LinkedIn',
+    url: 'https://www.linkedin.com/in/othman-makange1974',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.5 3.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM3.2 8h2.6v12H3.2V8Zm5 0h2.5v1.64h.04c.35-.66 1.2-1.99 3.64-1.99 3.9 0 4.62 2.56 4.62 5.89V20h-2.6v-5.73c0-1.37-.03-3.13-1.91-3.13-1.92 0-2.21 1.5-2.21 3.03V20H8.2V8Z" /></svg>'
+  }
+];
+
+const socialLinkMarkup = () => socialProfiles.map((profile) => (
+  '<a href="' + profile.url + '" aria-label="' + profile.label + '" target="_blank" rel="noopener noreferrer">' +
+  profile.icon +
+  '<span class="sr-only">' + profile.label + '</span></a>'
+)).join('');
+
+document.querySelectorAll('.social-links').forEach((group) => {
+  group.setAttribute('aria-label', 'Social media');
+  group.innerHTML = socialLinkMarkup();
+});
+
+document.querySelectorAll('.footer-col').forEach((column) => {
+  const heading = column.querySelector('h3');
+  if (!heading || !/follow us|tufuatilie/i.test(heading.textContent || '')) return;
+  column.querySelectorAll(':scope > span').forEach((text) => text.remove());
+  const links = document.createElement('div');
+  links.className = 'footer-social-links';
+  links.setAttribute('aria-label', 'Social media');
+  links.innerHTML = socialLinkMarkup();
+  column.append(links);
+});
+
 const storedLanguage = localStorage.getItem('ecopower-language') || document.documentElement.lang || 'en';
 setLanguage(storedLanguage);
 if (document.body.dataset.page === 'home' && new URLSearchParams(window.location.search).get('externalPreview') === '1') void syncCmsHomeContent(storedLanguage, true);

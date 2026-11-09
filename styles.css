@@ -935,6 +935,19 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .home-impact-summary > .page-width > p { margin-top: 12px; font-size: 11px; }
 }
 
+/* Compact stove cards for common Samsung and Android phone widths. */
+@media (max-width: 430px) {
+  .home-stove-grid { gap: 8px; }
+  .home-stove-card { padding: 9px; border-radius: 13px; }
+  .home-stove-card img { height: 116px; margin-bottom: 8px; padding: 5px; }
+  .home-stove-card .card-kicker { min-height: 28px; margin-bottom: 5px; font-size: 8.5px; }
+  .home-stove-card h3 { min-height: 32px; margin-bottom: 6px; font-size: 15px; }
+  .home-stove-card > p[data-mobile-read-content] { max-height: 3.9em; margin-bottom: 5px; font-size: 10.5px; }
+  .home-stove-card .mobile-read-toggle { margin-bottom: 8px; font-size: 9.5px; }
+  .home-stove-price { min-height: 20px; margin-bottom: 11px; font-size: 16px; }
+  .home-stove-card .button { min-height: 37px; padding: 8px 6px; font-size: 9.5px; }
+}
+
 /* Extra-narrow phone guardrails for 320–380px Samsung and compact Android screens. */
 @media (max-width: 380px) {
   :root { --page: calc(100% - 22px); }

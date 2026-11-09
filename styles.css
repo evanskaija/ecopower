@@ -630,7 +630,10 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .price-panel { width: 255px; padding: 11px; }
   .price-panel-grid strong { font-size: 16px; }
   .trust-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .trust-item { min-height: 77px; padding: 11px 13px; }
+  .trust-item { grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; min-height: 68px; padding: 10px 10px; }
+  .trust-icon { width: 20px; height: 20px; }
+  .trust-item strong { font-size: 13px; line-height: 1.18; }
+  .trust-item span { margin-top: 3px; font-size: 10px; line-height: 1.28; }
   .trust-item:nth-child(2) { border-right: 0; }
   .trust-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .section { padding: 82px 0; }

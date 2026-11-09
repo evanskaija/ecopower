@@ -30,6 +30,8 @@ async function main() {
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
   assert.match(adminStyles, /#media-backdrop[^\n]*z-index: 100/, 'Media Library backdrop should sit above Add Content');
   assert.match(adminStyles, /#media-modal[^\n]*z-index: 101/, 'Media Library should sit above Add Content');
+  assert.match(adminSource, /document\.body\.append\(backdrop\)/, 'Media Library should be portaled to the document body');
+  assert.match(adminSource, /event\.key === 'Escape'/, 'Media Library should support Escape to close');
   assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
   assert.match(adminSource, /if \(!closeMedia\(\) \|\| !closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'Add Content should close the Media Library before opening');
   assert.match(adminSource, /if \(type === 'stove'\) \{ block\.image = ''; /, 'new stoves should start without a selected image');

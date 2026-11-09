@@ -150,6 +150,7 @@
   let addContentDraft = null;
   let addContentInitialSnapshot = null;
   let editorSession = null;
+  let mediaFocusReturn = null;
   let previewMode = 'draft';
   let mediaTarget = null;
   let mediaBusy = false;
@@ -585,6 +586,24 @@
     document.body.classList.toggle('modal-open', modalOpen);
   }
 
+  function ensureMediaModalPortal() {
+    const backdrop = $('#media-backdrop');
+    const modal = $('#media-modal');
+    if (!backdrop || !modal || !document.body) return;
+    document.body.append(backdrop);
+    document.body.append(modal);
+  }
+
+  function mediaFocusableElements() {
+    const modal = $('#media-modal');
+    if (!modal) return [];
+    return [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((element) => element.offsetParent !== null);
+  }
+
+  function focusMediaModal() {
+    mediaFocusableElements()[0]?.focus();
+  }
+
   function pendingDraftSave() {
     return Boolean(draftSavePromise) || draftChangeVersion > draftSaveRevision || $('#draft-status')?.textContent === 'Unsaved changes';
   }
@@ -728,6 +747,11 @@
     if (image) image.src = assetUrl(src);
     const label = picker.querySelector('strong');
     if (label) label.textContent = name;
+  }
+
+  function focusMediaTargetButton(section, path) {
+    const button = [...document.querySelectorAll('[data-action="media"]')].find((item) => item.dataset.section === section && item.dataset.path === path);
+    button?.focus();
   }
 
   function renderHero(section) {
@@ -1214,6 +1238,8 @@
   }
 
   function openMedia(section, path) {
+    ensureMediaModalPortal();
+    mediaFocusReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     mediaTarget = { section, path };
     $('#media-upload').value = '';
     $('#media-url').value = '';
@@ -1227,6 +1253,7 @@
     $('#media-backdrop').hidden = false;
     $('#media-modal').hidden = false;
     syncModalScrollLock();
+    requestAnimationFrame(focusMediaModal);
   }
 
   function closeMedia({ force = false } = {}) {
@@ -1236,6 +1263,9 @@
     $('#media-modal').hidden = true;
     mediaTarget = null;
     syncModalScrollLock();
+    const focusTarget = mediaFocusReturn;
+    mediaFocusReturn = null;
+    if (focusTarget && document.contains(focusTarget)) focusTarget.focus();
     return true;
   }
 
@@ -1385,6 +1415,25 @@
     sensitive.dataset.originalValue = sensitive.value;
   });
 
+  document.addEventListener('keydown', (event) => {
+    const mediaModal = $('#media-modal');
+    if (mediaModal && !mediaModal.hidden) {
+      if (event.key === 'Escape') { event.preventDefault(); closeMedia(); return; }
+      if (event.key === 'Tab') {
+        const focusable = mediaFocusableElements();
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+    const addModal = $('#add-content-modal');
+    if (addModal && !addModal.hidden && event.key === 'Escape') { event.preventDefault(); closeAddContent(); return; }
+    if ($('#editor-drawer')?.classList.contains('open') && event.key === 'Escape') { event.preventDefault(); closeDrawer(); }
+  });
+
   document.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action], [data-page], [data-toast]');
     if (!target) {
@@ -1488,7 +1537,7 @@
       draftChangeVersion += 1;
       closeMedia({ force: true });
       updateMediaPicker(targetPath, selectedSrc, targetSection);
-      if (targetSection === '__new-content__') { renderAddContentModalForm(); showToast('Image selected for the new content block.'); return; }
+      if (targetSection === '__new-content__') { renderAddContentModalForm(); focusMediaTargetButton(targetSection, targetPath); showToast('Image selected for the new content block.'); return; }
       updatePreview();
       // Image selection is a content change. Persist it immediately so a
       // page switch, refresh, or publish cannot race the debounced text save.
@@ -1546,6 +1595,7 @@
     if (targetSection === '__new-content__') {
       closeMedia({ force: true });
       renderAddContentModalForm();
+      focusMediaTargetButton(targetSection, targetPath);
       showToast('Image uploaded and attached to the new content block.');
       return;
     }

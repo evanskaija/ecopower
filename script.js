@@ -870,6 +870,11 @@ const setupMobileReadMore = () => {
   if (catalogueCopy && catalogueList && !catalogueCopy.dataset.mobileReadCard) {
     addMobileReadToggle(catalogueCopy, catalogueList);
   }
+  const crewPanel = document.querySelector('.crew-panel');
+  const crewDescription = crewPanel?.querySelector(':scope > div > p:not(.eyebrow)');
+  if (crewPanel && crewDescription && !crewPanel.dataset.mobileReadCard) {
+    addMobileReadToggle(crewPanel, crewDescription);
+  }
 };
 setupMobileReadMore();
 document.querySelectorAll('[data-mobile-read-toggle]').forEach((button) => updateMobileReadToggleLabel(button));

@@ -9,6 +9,14 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const REMOTE_FETCH_TIMEOUT_MS = 6000;
 const MAX_REMOTE_REDIRECTS = 3;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
+const MEDIA_METADATA_LIMITS = Object.freeze({
+  alt_text_en: 250,
+  alt_text_sw: 250,
+  caption_en: 300,
+  caption_sw: 300,
+  description_en: 4000,
+  description_sw: 4000
+});
 const IMAGE_EXTENSIONS = new Map([
   ['image/jpeg', '.jpg'],
   ['image/png', '.png'],
@@ -92,6 +100,16 @@ function inspectImageBuffer(buffer, declaredMime = '') {
   return { mimeType: actualMime, extension: IMAGE_EXTENSIONS.get(actualMime), width: dimensions.width, height: dimensions.height, fileSize: buffer.length };
 }
 
+function normalizeMediaMetadata(input = {}) {
+  const metadata = {};
+  for (const [key, max] of Object.entries(MEDIA_METADATA_LIMITS)) {
+    const value = String(input?.[key] ?? '').trim();
+    if (value.length > max) throw new Error(`${key.replaceAll('_', ' ')} is too long (maximum ${max} characters).`);
+    metadata[key] = value;
+  }
+  return metadata;
+}
+
 async function readResponseBodyLimited(response) {
   const contentLength = Number(response.headers.get('content-length') || 0);
   if (contentLength > MAX_IMAGE_SIZE) throw new Error(`The remote image is larger than ${Math.round(MAX_IMAGE_SIZE / 1024 / 1024)} MB.`);
@@ -115,7 +133,10 @@ async function fetchRemoteImage(value) {
       response = await fetch(current, {
         redirect: 'manual',
         signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS),
-        headers: { accept: 'image/jpeg,image/png,image/webp,image/avif,image/gif;q=0.9' }
+        headers: {
+          accept: 'image/jpeg,image/png,image/webp,image/avif,image/gif;q=0.9',
+          'user-agent': 'EcoPower-CMS-Image-Importer/1.0 (+https://ecopower.co.tz)'
+        }
       });
     } catch (error) {
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new Error('The external image request timed out.');
@@ -128,7 +149,10 @@ async function fetchRemoteImage(value) {
       current = await assertSafeRemoteDestination(new URL(location, current).toString());
       continue;
     }
-    if (!response.ok) throw new Error(`The external image is unavailable (${response.status}).`);
+    if (!response.ok) {
+      if ([401, 403, 429].includes(response.status)) throw new Error(`The external website blocked automated image downloads (${response.status}). Download the image and use Upload from Computer instead.`);
+      throw new Error(`The external image is unavailable (${response.status}).`);
+    }
     const declaredMime = String(response.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase();
     if (declaredMime && declaredMime !== 'application/octet-stream' && !ALLOWED_IMAGE_TYPES.has(declaredMime)) throw new Error('The URL does not point to a supported image type.');
     const buffer = await readResponseBodyLimited(response);
@@ -150,4 +174,4 @@ function validateImageReference(value) {
   return null;
 }
 
-module.exports = { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, assertSafeRemoteUrl, fetchRemoteImage, inspectImageBuffer, validateImageReference };
+module.exports = { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, MEDIA_METADATA_LIMITS, assertSafeRemoteDestination, assertSafeRemoteUrl, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference };

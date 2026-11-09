@@ -191,6 +191,11 @@ button { cursor: pointer; }
 .media-url-controls .field-input { flex: 1; min-width: 0; }
 .media-url-controls .admin-button { min-height: 36px; white-space: nowrap; }
 .media-url-row small, .media-upload-status { margin: 0; color: var(--admin-muted); font-size: 9px; line-height: 1.45; }
+.media-metadata-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 5px; }
+.media-metadata-grid .field-group { gap: 4px; }
+.media-metadata-grid .field-group > span { color: var(--admin-ink); font-size: 9px; font-weight: 800; }
+.media-metadata-wide { grid-column: 1 / -1; }
+.media-metadata-grid .field-textarea { min-height: 55px; }
 .media-upload-status { min-height: 15px; padding: 10px 24px 0; }
 .media-upload-status.is-error { color: #be3d46; }
 .media-upload-status.is-success { color: var(--admin-green); }
@@ -249,6 +254,8 @@ button { cursor: pointer; }
   .section-manager-actions { align-items: flex-end; flex-direction: column; gap: 4px; }
   .media-url-controls { align-items: stretch; flex-direction: column; }
   .media-url-controls .admin-button { width: 100%; }
+  .media-metadata-grid { grid-template-columns: 1fr; }
+  .media-metadata-wide { grid-column: auto; }
   .dashboard-hero { flex-direction: column; }
   .dashboard-hero h1 { font-size: 30px; }
   .dashboard-metrics { grid-template-columns: 1fr 1fr; gap: 8px; }

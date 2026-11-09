@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
 const Database = require('better-sqlite3');
-const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, validateImageReference } = require('./media-security.js');
+const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
 
 const ROOT = __dirname;
 const DATA_DIR = path.resolve(ROOT, 'data');
@@ -448,13 +448,15 @@ app.get('/api/public/:slug', (req, res) => {
 });
 
 app.get('/api/media', requireAuth, (_req, res) => {
-  const assets = db.prepare('SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC').all().map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` }));
+  const assets = db.prepare('SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC').all().map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` }));
   res.json({ media: assets });
 });
 
 app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
   try {
+    let metadata;
+    try { metadata = normalizeMediaMetadata(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
     const buffer = process.env.NODE_ENV === 'production' ? req.file.buffer : fs.readFileSync(req.file.path);
     const inspected = inspectImageBuffer(buffer, req.file.mimetype);
     const id = crypto.randomUUID();
@@ -467,10 +469,10 @@ app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upl
     } else {
       storagePath = path.relative(ROOT, req.file.path);
     }
-    db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, req.file.originalname, storagePath, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id);
+    db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, req.file.originalname, storagePath, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id);
     audit(req, 'media.upload', id, { filename: req.file.originalname });
-    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    res.status(201).json({ media: { id, original_name: req.file.originalname, ...metadata, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) {
     if (req.file.path) fs.rmSync(req.file.path, { force: true });
     res.status(400).json({ error: `Could not read the uploaded image: ${error.message}` });
@@ -479,6 +481,8 @@ app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upl
 app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res) => {
   const sourceUrl = String(req.body?.url || '').trim();
   if (!sourceUrl) return res.status(400).json({ error: 'An HTTPS image URL is required.' });
+  let metadata;
+  try { metadata = normalizeMediaMetadata(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
   let imported;
   try { imported = await fetchRemoteImage(sourceUrl); } catch (error) { return res.status(400).json({ error: error.message }); }
   try {
@@ -495,10 +499,10 @@ app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor
       storagePath = path.relative(ROOT, localPath);
     }
     const originalName = `remote-${imported.sourceHash}${IMAGE_EXTENSIONS.get(imported.mimeType)}`;
-    db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, originalName, storagePath, imported.mimeType, imported.fileSize, imported.width, imported.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id);
+    db.prepare(`INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, originalName, storagePath, imported.mimeType, imported.fileSize, imported.width, imported.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id);
     audit(req, 'media.import', id, { source: imported.sourceUrl, mimeType: imported.mimeType, fileSize: imported.fileSize });
-    return res.status(201).json({ media: { id, original_name: originalName, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    return res.status(201).json({ media: { id, original_name: originalName, ...metadata, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) { return res.status(500).json({ error: error.message || 'The image could not be imported.' }); }
 });
 

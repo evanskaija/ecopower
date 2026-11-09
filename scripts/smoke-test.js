@@ -58,8 +58,13 @@ async function main() {
     const mime = /\.png$/i.test(imageName) ? 'image/png' : /\.webp$/i.test(imageName) ? 'image/webp' : 'image/jpeg';
     const form = new FormData();
     form.append('file', new Blob([sourceBytes], { type: mime }), imageName);
+    form.append('alt_text_en', `Smoke test ${imageName}`);
+    form.append('caption_en', 'Stored media caption');
+    form.append('description_en', 'Stored media description');
     const result = await request('/api/media', { method: 'POST', body: form });
     assert.equal(result.response.status, 201, `image upload should create a media record for ${imageName}`);
+    assert.equal(result.body.media.alt_text_en, `Smoke test ${imageName}`, 'uploaded image metadata should be returned by the API');
+    assert.equal(result.body.media.caption_en, 'Stored media caption', 'uploaded image caption should be stored');
     return { id: result.body.media.id, bytes: sourceBytes };
   }
 
@@ -92,6 +97,9 @@ async function main() {
     const galleryImage = await uploadSourceImage(imageNames[1]);
     const productImage = await uploadSourceImage(imageNames[2]);
     const mediaId = heroImage.id;
+    result = await request('/api/media');
+    const listedHero = result.body.media.find((item) => item.id === mediaId);
+    assert.equal(listedHero.description_en, 'Stored media description', 'media metadata should survive a library reload');
 
     result = await request(`/api/media/${mediaId}/file`);
     assert.equal(result.response.status, 200, 'private uploaded image should be readable to the authenticated administrator');

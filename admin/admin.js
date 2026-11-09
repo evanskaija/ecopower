@@ -142,6 +142,7 @@
   let addContentDraft = null;
   let previewMode = 'draft';
   let mediaTarget = null;
+  let mediaBusy = false;
   let toastTimer;
   let currentUser = null;
   let draftSaveTimer = null;
@@ -194,6 +195,7 @@
   }
 
   function setMediaBusy(busy, message = '') {
+    mediaBusy = busy;
     setCmsBusy(busy);
     const upload = $('#media-upload');
     const uploadLabel = upload?.closest('.upload-button');
@@ -211,6 +213,50 @@
     if (!status) return;
     status.textContent = message;
     status.className = `media-upload-status${kind ? ` is-${kind}` : ''}`;
+  }
+
+  function mediaMetadata() {
+    const metadata = { alt_text_en: '', alt_text_sw: '', caption_en: '', caption_sw: '', description_en: '', description_sw: '' };
+    const suffix = language === 'sw' ? 'sw' : 'en';
+    metadata[`alt_text_${suffix}`] = $('#media-alt-text')?.value.trim() || '';
+    metadata[`caption_${suffix}`] = $('#media-caption')?.value.trim() || '';
+    metadata[`description_${suffix}`] = $('#media-description')?.value.trim() || '';
+    return metadata;
+  }
+
+  function applyImportedMetadata(targetSection, targetPath, metadata) {
+    const suffix = language === 'sw' ? 'sw' : 'en';
+    const alt = metadata?.[`alt_text_${suffix}`] || '';
+    const caption = metadata?.[`caption_${suffix}`] || '';
+    const description = metadata?.[`description_${suffix}`] || '';
+    const target = contentForSection(targetSection);
+    if (targetSection === '__new-content__') {
+      const block = addContentDraft?.block;
+      if (!block) return;
+      const parts = targetPath.split('.');
+      const record = parts[0] === 'cards' ? block.cards?.[Number(parts[1])] : parts[0] === 'images' ? block.images?.[Number(parts[1])] : block;
+      if (!record) return;
+      const copy = record[language] || (record[language] = {});
+      if (alt) copy.alt = alt;
+      if (caption && 'caption' in copy) copy.caption = caption;
+      if (description && 'description' in copy) copy.description = description;
+      return;
+    }
+    const isGeneric = activePage !== 'home' && !targetSection.startsWith('block:');
+    if (isGeneric) {
+      const index = Number(targetPath.match(/^elements\.(\d+)\.value$/)?.[1]);
+      if (Number.isInteger(index) && target.elements?.[index]) target.elements[index].alt = alt || target.elements[index].alt || '';
+      return;
+    }
+    const parts = targetPath.split('.');
+    const record = parts.length === 1 ? target : getAt(target, parts.slice(0, -1).join('.'));
+    const copy = record?.[language] || (record && (record[language] = {}));
+    if (!copy) return;
+    if (alt) copy.alt = alt;
+    if (targetSection.startsWith('block:')) {
+      if (caption && 'caption' in copy) copy.caption = caption;
+      if (description && 'description' in copy) copy.description = description;
+    }
   }
 
   function updateLastUpdated(value) {
@@ -1085,6 +1131,10 @@
     mediaTarget = { section, path };
     $('#media-upload').value = '';
     $('#media-url').value = '';
+    $('#media-alt-text').value = '';
+    $('#media-caption').value = '';
+    $('#media-description').value = '';
+    $('#media-metadata-language').textContent = `Metadata will be saved for ${language === 'sw' ? 'Kiswahili' : 'English'} and attached to the selected image content.`;
     setMediaStatus('');
     setMediaBusy(false);
     renderMedia();
@@ -1378,42 +1428,54 @@
     const item = { ...uploaded, name: uploaded.original_name, uploaded: true };
     state.media.unshift(item);
     setAt(contentForSection(targetSection), targetPath, item.src);
+    applyImportedMetadata(targetSection, targetPath, item);
     draftChangeVersion += 1;
-    closeMedia();
     updateMediaPicker(targetPath, item.src, targetSection);
     if (targetSection === '__new-content__') {
+      closeMedia();
       renderAddContentModalForm();
       showToast('Image uploaded and attached to the new content block.');
       return;
     }
     updatePreview();
     const saved = await saveDraftRemote(true);
-    if (saved) showToast(successMessage);
+    if (saved) {
+      closeMedia();
+      showToast(successMessage);
+    } else {
+      setMediaStatus('The image is stored, but the page draft could not be saved. Keep this modal open and try Save draft again.', 'error');
+    }
   }
 
   $('#media-upload').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
-    if (!file || !mediaTarget) return;
+    if (!file || !mediaTarget || mediaBusy) return;
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)) { showToast('Please upload a JPEG, PNG, WebP, AVIF or GIF image.'); return; }
     if (file.size > 10 * 1024 * 1024) { showToast('Image must be smaller than 10 MB.'); return; }
     const targetSection = mediaTarget.section;
     const targetPath = mediaTarget.path;
     const formData = new FormData();
     formData.append('file', file);
-    setMediaBusy(true, 'Uploading image… 0%');
+    Object.entries(mediaMetadata()).forEach(([key, value]) => formData.append(key, value));
+    setMediaBusy(true, 'Validating image…');
+    setMediaStatus('Validating image…', 'busy');
+    requestAnimationFrame(() => setMediaBusy(true, 'Uploading image to Preview Blob… 0%'));
     uploadMediaWithProgress(formData, (percent) => setMediaBusy(true, `Uploading image… ${percent}%`)).then((uploaded) => assignUploadedMedia(uploaded, targetSection, targetPath, 'Image uploaded, saved to the draft, and ready to publish.')).catch((error) => { setMediaStatus(`Upload failed: ${error.message}`, 'error'); showToast(`Upload failed: ${error.message}`); }).finally(() => { setMediaBusy(false); event.target.value = ''; });
   });
 
   $('#media-url-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!mediaTarget) return;
+    if (!mediaTarget || mediaBusy) return;
     const sourceUrl = $('#media-url').value.trim();
     if (!sourceUrl) return;
     const targetSection = mediaTarget.section;
     const targetPath = mediaTarget.path;
-    setMediaBusy(true, 'Validating and importing image…');
+    const metadata = mediaMetadata();
+    setMediaBusy(true, 'Validating image URL…');
     try {
-      const result = await apiRequest('/api/media/import', { method: 'POST', body: JSON.stringify({ url: sourceUrl }) });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      setMediaBusy(true, 'Uploading validated image to Preview Blob…');
+      const result = await apiRequest('/api/media/import', { method: 'POST', body: JSON.stringify({ url: sourceUrl, ...metadata }) });
       await assignUploadedMedia(result.media, targetSection, targetPath, 'External image imported, saved to the draft, and ready to publish.');
     } catch (error) {
       setMediaStatus(`Import failed: ${error.message}`, 'error');

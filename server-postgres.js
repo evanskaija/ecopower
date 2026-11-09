@@ -13,7 +13,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
-const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, validateImageReference } = require('./media-security.js');
+const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
 
 const ROOT = __dirname;
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
@@ -417,28 +417,32 @@ app.get('/api/public/:slug', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-app.get('/api/media', requireAuth, async (_req, res, next) => { try { const assets = (await query(pool, 'SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC')).rows.map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` })); res.json({ media: assets }); } catch (error) { next(error); } });
+app.get('/api/media', requireAuth, async (_req, res, next) => { try { const assets = (await query(pool, 'SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC')).rows.map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` })); res.json({ media: assets }); } catch (error) { next(error); } });
 app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
-    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: 'BLOB_PRIVATE_READ_WRITE_TOKEN is required before uploading an image.' });
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: `${privateTokenName} is required before uploading an image.` });
+    let metadata;
+    try { metadata = normalizeMediaMetadata(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
     let inspected;
     try { inspected = inspectImageBuffer(req.file.buffer, req.file.mimetype); } catch (error) { return res.status(400).json({ error: error.message }); }
     const id = crypto.randomUUID();
     const { put } = require('@vercel/blob');
     const blob = await put(`private/${id}${inspected.extension}`, req.file.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: inspected.mimeType });
     assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
-    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, req.file.originalname, blob.pathname || blob.url, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
+    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, req.file.originalname, blob.pathname || blob.url, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
     audit(req, 'media.upload', id, { filename: req.file.originalname });
-    res.status(201).json({ media: { id, original_name: req.file.originalname, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    res.status(201).json({ media: { id, original_name: req.file.originalname, ...metadata, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) { next(error); }
 });
 app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
   try {
     const sourceUrl = String(req.body?.url || '').trim();
     if (!sourceUrl) return res.status(400).json({ error: 'An HTTPS image URL is required.' });
-    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: 'BLOB_PRIVATE_READ_WRITE_TOKEN is required before importing an image.' });
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: `${privateTokenName} is required before importing an image.` });
+    let metadata;
+    try { metadata = normalizeMediaMetadata(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
     let imported;
     try { imported = await fetchRemoteImage(sourceUrl); } catch (error) { return res.status(400).json({ error: error.message }); }
     const id = crypto.randomUUID();
@@ -446,10 +450,10 @@ app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor
     const blob = await put(`private/${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`, imported.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: imported.mimeType });
     assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
     const originalName = `remote-${imported.sourceHash}${IMAGE_EXTENSIONS.get(imported.mimeType)}`;
-    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, originalName, blob.pathname || blob.url, imported.mimeType, imported.fileSize, imported.width, imported.height, String(req.body.alt_text_en || ''), String(req.body.alt_text_sw || ''), req.user.id]);
+    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, originalName, blob.pathname || blob.url, imported.mimeType, imported.fileSize, imported.width, imported.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
     audit(req, 'media.import', id, { source: imported.sourceUrl, mimeType: imported.mimeType, fileSize: imported.fileSize });
-    res.status(201).json({ media: { id, original_name: originalName, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
+    res.status(201).json({ media: { id, original_name: originalName, ...metadata, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
   } catch (error) { next(error); }
 });
 app.get('/api/media/:id/file', requireAuth, async (req, res, next) => {

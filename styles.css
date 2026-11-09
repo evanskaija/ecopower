@@ -1271,7 +1271,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .nav-actions { gap: 10px; padding-top: 16px; }
   .nav-actions .language-switcher { min-width: 98px; min-height: 44px; padding: 7px 10px; }
   .nav-actions > .button { flex: 1 1 auto; min-width: 0; max-width: 190px; min-height: 44px; padding: 10px 14px; font-size: 12px; }
-  .language-menu { position: fixed; top: auto; right: 16px; bottom: 16px; left: 16px; z-index: 80; min-width: 0; max-width: 560px; max-height: calc(100dvh - 32px); margin-inline: auto; padding: 9px; overflow-y: auto; border-radius: 16px; box-shadow: 0 20px 48px rgba(9,43,32,.24); }
+  .language-menu { position: absolute; top: auto; right: 0; bottom: calc(100% + 10px); left: auto; z-index: 80; width: min(280px, calc(100vw - 34px)); min-width: 0; max-height: min(300px, calc(100dvh - 32px)); padding: 9px; overflow-y: auto; border-radius: 16px; box-shadow: 0 20px 48px rgba(9,43,32,.24); }
   .language-menu::before { display: none; }
   .language-menu-label { padding: 5px 9px 7px; font-size: 9px; }
   .language-menu button { min-height: 46px; padding: 8px 9px; }
@@ -1284,5 +1284,5 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .nav-actions { gap: 8px; padding-top: 13px; }
   .nav-actions .language-switcher { min-width: 92px; padding-inline: 8px; }
   .nav-actions > .button { padding-inline: 11px; font-size: 11px; }
-  .language-menu { right: 12px; bottom: 12px; left: 12px; }
+  .language-menu { right: 0; bottom: calc(100% + 8px); width: min(270px, calc(100vw - 24px)); }
 }

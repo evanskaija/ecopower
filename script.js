@@ -915,7 +915,13 @@ const setLanguage = (language) => {
   menuToggle?.setAttribute('aria-label', menuOpen ? menuLabels.close : menuLabels.open);
   const menuAssistiveLabel = menuToggle?.querySelector('.sr-only');
   if (menuAssistiveLabel) menuAssistiveLabel.textContent = menuOpen ? menuLabels.close : menuLabels.open;
-  document.querySelectorAll('.language-menu button[data-language]').forEach((button) => button.classList.toggle('selected', button.dataset.language === safeLanguage));
+  document.querySelectorAll('.language-menu button[data-language]').forEach((button) => {
+    const selected = button.dataset.language === safeLanguage;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    const selectedMark = button.querySelector('.language-selected');
+    if (selectedMark) selectedMark.textContent = selected ? '✓' : '';
+  });
   syncMobileReadToggleLabels();
 };
 

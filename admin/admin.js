@@ -422,6 +422,7 @@
   function showDashboard() {
     if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     isDashboard = true;
+    resetTransientModals();
     $('#dashboard-view').hidden = false;
     $('#page-editor-view').hidden = true;
     document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'dashboard'));
@@ -1265,6 +1266,9 @@
   }
 
   function openMedia(section, path) {
+    // The Media Library belongs to page editors only. A stale click, restored
+    // DOM state, or legacy dashboard action must never open it on the overview.
+    if (isDashboard || $('#page-editor-view')?.hidden) return;
     ensureMediaModalPortal();
     mediaFocusReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     mediaTarget = { section, path };

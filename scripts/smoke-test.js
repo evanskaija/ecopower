@@ -28,6 +28,7 @@ async function main() {
   assert.equal(adminHtml.includes('add-content-context'), false, 'Add Content should not show repeated introductory copy');
   assert.equal(adminHtml.includes('data-action="media-library"'), false, 'Dashboard should not expose a standalone Media Library action');
   assert.equal(adminHtml.includes('Manage Media'), false, 'Dashboard should not expose a Manage Media action');
+  assert.match(adminHtml, /id="page-editor-view" hidden/, 'page editor should start hidden until it is intentionally opened');
   assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
   assert.match(adminStyles, /#media-backdrop[^\n]*z-index: 100/, 'Media Library backdrop should sit above Add Content');
@@ -35,6 +36,7 @@ async function main() {
   assert.match(adminSource, /document\.body\.append\(backdrop\)/, 'Media Library should be portaled to the document body');
   assert.match(adminSource, /function resetTransientModals\(\)/, 'dashboard startup should reset transient modal state');
   assert.match(adminSource, /window\.addEventListener\('pageshow', resetTransientModals\)/, 'browser-restored dashboard should keep transient modals closed');
+  assert.match(adminSource, /if \(isDashboard \|\| \$\('#page-editor-view'\)\?\.hidden\) return;/, 'Media Library should be blocked while Dashboard is active');
   assert.match(adminSource, /event\.key === 'Escape'/, 'Media Library should support Escape to close');
   assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
   assert.match(adminSource, /if \(!closeMedia\(\) \|\| !closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'Add Content should close the Media Library before opening');

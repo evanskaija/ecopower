@@ -22,8 +22,15 @@ function assertOk(condition, message) {
 async function main() {
   const adminHtml = fs.readFileSync(path.join(ROOT, 'admin', 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(ROOT, 'admin', 'admin.js'), 'utf8');
+  const adminStyles = fs.readFileSync(path.join(ROOT, 'admin', 'admin.css'), 'utf8');
   assert.equal(adminHtml.includes('Choose a content block'), false, 'Home Add Content should not show the old chooser');
   assert.equal((adminHtml.match(/data-block-type=/g) || []).length, 0, 'Home Add Content should not expose block type buttons');
+  assert.equal(adminHtml.includes('add-content-context'), false, 'Add Content should not show repeated introductory copy');
+  assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
+  assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
+  assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
+  assert.match(adminSource, /if \(type === 'stove'\) \{ block\.image = ''; /, 'new stoves should start without a selected image');
+  assert.match(adminSource, /format-advanced/, 'advanced text formatting should be expandable');
   for (const section of ['products', 'payment', 'cookstoves', 'partners']) assert.match(adminSource, new RegExp(`canAddContent\\(section\\)|${section}`), `${section} should remain an Add Content section`);
   for (const type of ['product', 'payment', 'stove', 'partner']) assert.match(adminSource, new RegExp(`block\.type === '${type}'`), `${type} Add Content form should exist`);
   for (const section of ['hero', 'trust', 'ordering', 'factory', 'kitchen', 'testimonial', 'impact', 'images', 'footer']) assert.equal(adminSource.includes(`['${section}',`), true, `${section} should remain an editable Home section`);

@@ -148,6 +148,8 @@
   let isDashboard = false;
   let pendingContentSection = 'hero';
   let addContentDraft = null;
+  let addContentInitialSnapshot = null;
+  let editorSession = null;
   let previewMode = 'draft';
   let mediaTarget = null;
   let mediaBusy = false;
@@ -161,6 +163,7 @@
 
   const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   const assetUrl = (src = '') => src.startsWith('media:') ? `/api/media/${src.slice(6)}/file` : src.startsWith('data:') || src.startsWith('http') || src.startsWith('/') ? src : `../${src}`;
+  const emptyImagePlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'%3E%3Crect width='160' height='100' fill='%23eaf0eb'/%3E%3Cpath d='M45 68l22-25 17 18 12-14 19 21z' fill='%23b7c9bc'/%3E%3Ccircle cx='101' cy='34' r='9' fill='%23b7c9bc'/%3E%3C/svg%3E";
   const getAt = (obj, path) => path.split('.').reduce((value, key) => value?.[key], obj);
   const setAt = (obj, path, value) => { const bits = path.split('.'); const last = bits.pop(); const parent = bits.reduce((current, key) => current[key] ??= {}, obj); parent[last] = value; };
   const activeCopy = (section) => section[language] || section.en || {};
@@ -384,6 +387,7 @@
 
   async function switchPage(slug, trigger) {
     if (!pageMeta[slug] || (slug === activePage && !isDashboard)) return;
+    if (!closeAddContent() || !closeDrawer()) return;
     activePage = slug;
     isDashboard = false;
     activeSection = slug === 'home' ? 'hero' : 'generic-text';
@@ -398,7 +402,6 @@
     document.querySelector('.admin-notice strong').textContent = `${pageMeta[slug].label} editor`;
     document.querySelector('.admin-notice p').lastChild.textContent = ` — Edit the actual sections, images and content on this public page. Changes stay private until you publish.`;
     $('#preview-frame').src = previewUrl(slug);
-    closeDrawer();
     showToast(`Loading ${pageMeta[slug].label} editor…`);
     try { await loadRemoteState(); showToast(`${pageMeta[slug].label} editor loaded.`); } catch (error) { showToast(`Could not load this page: ${error.message}`); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -415,6 +418,7 @@
     }
   }
   function showDashboard() {
+    if (!closeAddContent() || !closeDrawer()) return;
     isDashboard = true;
     $('#dashboard-view').hidden = false;
     $('#page-editor-view').hidden = true;
@@ -576,6 +580,40 @@
 
   function pageIsDirty() { return JSON.stringify(normalizeMediaForCompare(currentDraft())) !== JSON.stringify(normalizeMediaForCompare(currentPublished())); }
 
+  function syncModalScrollLock() {
+    const modalOpen = Boolean(document.querySelector('.admin-drawer.open, .admin-modal:not([hidden])'));
+    document.body.classList.toggle('modal-open', modalOpen);
+  }
+
+  function pendingDraftSave() {
+    return Boolean(draftSavePromise) || draftChangeVersion > draftSaveRevision || $('#draft-status')?.textContent === 'Unsaved changes';
+  }
+
+  function beginEditorSession() {
+    const key = `${activePage}:${language}:${activeSection}`;
+    if (!editorSession || editorSession.key !== key) editorSession = { key, snapshot: clone(currentPageContent()) };
+  }
+
+  function hasUnsavedEditorChanges() {
+    if (!editorSession) return false;
+    return pendingDraftSave() || JSON.stringify(normalizeMediaForCompare(editorSession.snapshot)) !== JSON.stringify(normalizeMediaForCompare(currentPageContent()));
+  }
+
+  function hasUnsavedAddContent() {
+    if (!addContentDraft || !addContentInitialSnapshot) return false;
+    return JSON.stringify(normalizeMediaForCompare(addContentDraft.block)) !== JSON.stringify(normalizeMediaForCompare(addContentInitialSnapshot));
+  }
+
+  function confirmCloseEditor() {
+    if (!hasUnsavedEditorChanges()) return true;
+    return window.confirm('You have unsaved editor changes. Close this editor and keep them in the current draft?');
+  }
+
+  function confirmCloseAddContent() {
+    if (!hasUnsavedAddContent()) return true;
+    return window.confirm('This new item has unsaved changes. Close Add Content and discard this new item?');
+  }
+
   async function saveDraftRemote(showMessage = true) {
     if (!currentUser || loadingRemoteState) return false;
     if (draftSavePromise) {
@@ -654,7 +692,13 @@
   function formatToolbar(path, format = {}) {
     const value = { ...textFormatDefaults, ...(format || {}) };
     const select = (key, label, choices) => `<label><span>${label}</span><select class="format-select" data-format-path="${path}" data-format-key="${key}">${choices.map((choice) => `<option value="${choice}" ${value[key] === choice ? 'selected' : ''}>${choice[0].toUpperCase()}${choice.slice(1)}</option>`).join('')}</select></label>`;
-    return `<div class="format-toolbar" aria-label="Text formatting">${select('size', 'Size', ['small', 'medium', 'large', 'display'])}${select('font', 'Font', ['sans', 'serif', 'display'])}${select('weight', 'Weight', ['regular', 'bold'])}${select('style', 'Style', ['normal', 'italic'])}${select('color', 'Color', ['ink', 'forest', 'muted', 'accent'])}${select('align', 'Align', ['left', 'center', 'right'])}${select('spacing', 'Spacing', ['tight', 'normal', 'loose'])}${select('heading', 'Level', ['p', 'h2', 'h3'])}</div>`;
+    const toggle = (key, label, selected) => `<label class="format-toggle"><input type="checkbox" data-format-path="${path}" data-format-key="${key}" ${selected ? 'checked' : ''} /><span>${label}</span></label>`;
+    return `<div class="format-toolbar" aria-label="Text formatting"><div class="format-toolbar-main">${select('size', 'Font size', ['small', 'medium', 'large', 'display'])}${select('font', 'Font family', ['sans', 'serif', 'display'])}${select('color', 'Text color', ['ink', 'forest', 'muted', 'accent'])}${toggle('weight', 'Bold', value.weight === 'bold')}${toggle('style', 'Italic', value.style === 'italic')}${select('align', 'Alignment', ['left', 'center', 'right'])}</div><details class="format-advanced"><summary>Advanced formatting</summary><div class="format-toolbar-advanced">${select('spacing', 'Spacing', ['tight', 'normal', 'loose'])}${select('heading', 'Level', ['p', 'h2', 'h3'])}</div></details></div>`;
+  }
+
+  function formatControlValue(target) {
+    if (target.type !== 'checkbox') return target.value;
+    return target.dataset.formatKey === 'weight' ? (target.checked ? 'bold' : 'regular') : (target.checked ? 'italic' : 'normal');
   }
 
   function selectField(label, path, value, options = {}) {
@@ -667,7 +711,7 @@
     const name = state.media.find((item) => item.src === safeValue)?.name || safeValue.split('/').pop() || 'No image selected';
     const section = options.section || activeSection;
     const position = options.positionPath ? getAt(contentForSection(section), options.positionPath) || 'center' : null;
-    return `<div class="field-group"><label>${label}</label><div class="media-picker"><img src="${assetUrl(safeValue)}" alt="" style="object-position:${position || 'center'}" /><div class="media-picker-info"><strong>${escapeHtml(name)}</strong><small>Click to replace or reposition</small><button type="button" data-action="media" data-section="${escapeHtml(section)}" data-path="${path}">Change image</button></div></div>${options.positionPath ? selectField('Image position', options.positionPath, position, { choices: ['center', 'top', 'bottom', 'left', 'right'] }) : ''}</div>`;
+    return `<div class="field-group"><label>${label}</label><div class="media-picker"><img src="${safeValue ? assetUrl(safeValue) : emptyImagePlaceholder}" alt="${safeValue ? '' : 'No image selected'}" style="object-position:${position || 'center'}" /><div class="media-picker-info"><strong>${escapeHtml(name)}</strong><small>${safeValue ? 'Click to replace or reposition' : 'Choose an image to continue'}</small><button type="button" data-action="media" data-section="${escapeHtml(section)}" data-path="${path}">Choose image</button></div></div>${options.positionPath ? selectField('Image position', options.positionPath, position, { choices: ['center', 'top', 'bottom', 'left', 'right'] }) : ''}</div>`;
   }
 
   function updateMediaPicker(path, src, section = null) {
@@ -775,7 +819,8 @@
     const block = { id: newBlockId(type), type, visible: true, en: newBlockCopy(''), sw: newBlockCopy('') };
     if (type === 'image' || type === 'imageText') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png'; block.position = 'center'; }
     if (type === 'imageText') block.layout = 'left';
-    if (['product', 'payment', 'stove'].includes(type)) { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_004.jpeg'; block.position = 'center'; }
+    if (['product', 'payment'].includes(type)) { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_004.jpeg'; block.position = 'center'; }
+    if (type === 'stove') { block.image = ''; block.position = 'center'; }
     if (type === 'product') { block.price = ''; block.link = 'https://wa.me/255784017225'; }
     if (type === 'stove') block.price = '';
     if (type === 'partner' || type === 'testimonial') { block.image = state.media[0]?.src || 'EcoPower_all_extracted_images/page_01_image_002.png'; block.position = 'center'; }
@@ -801,6 +846,7 @@
   }
 
   function renderDynamicBlockForm(open = true) {
+    if (open) beginEditorSession();
     const block = dynamicBlockForSection();
     if (!block) return;
     if (block.type === 'cards' && !Array.isArray(block.cards)) block.cards = [];
@@ -819,12 +865,12 @@
     if (block.type === 'gallery') html += `${field('Small section label', `${language}.subheading`, copy.subheading || '')}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${block.images.map((item, index) => renderDynamicGalleryImage(block, item, index)).join('')}<button type="button" class="admin-button button-outline" data-action="add-gallery-image" data-block-id="${escapeHtml(block.id)}">Add gallery image</button>`;
     if (block.type === 'product') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Size', `${language}.kicker`, copy.kicker || '')}${field('Price', 'price', block.price || '')}`;
     if (block.type === 'payment') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Payment instruction (optional)', `${language}.instruction`, copy.instruction || '')}`;
-    if (block.type === 'stove') html += `${mediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
+    if (block.type === 'stove') html += `${mediaPicker('Stove image', 'image', block.image, { positionPath: 'position' })}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
     if (block.type === 'partner') html += `${mediaPicker('Partner logo', 'image', block.image, { positionPath: 'position' })}${field('Partner name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Website link', `${language}.link`, copy.link || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'testimonial') html += `${mediaPicker('Customer image', 'image', block.image, { positionPath: 'position' })}${field('Customer name', `${language}.title`, copy.title || '')}${field('Testimonial', `${language}.quote`, copy.quote || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Attribution', `${language}.attribution`, copy.attribution || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'cta') html += `${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     $('#section-form').innerHTML = html;
-    if (open) { drawer.setAttribute('aria-hidden', 'false'); drawer.classList.add('open'); $('#drawer-backdrop').hidden = false; }
+    if (open) { drawer.setAttribute('aria-hidden', 'false'); drawer.classList.add('open'); $('#drawer-backdrop').hidden = false; syncModalScrollLock(); }
   }
 
   function pendingMediaPicker(label, path, value, options = {}) {
@@ -842,7 +888,7 @@
     if (block.type === 'imageText') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${selectField('Image alignment', 'layout', block.layout || 'left', { choices: ['left', 'right'] })}${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Alternative text', `${language}.alt`, copy.alt || '')}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
     if (block.type === 'product') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Product name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Size', `${language}.kicker`, copy.kicker || '')}${field('Price', 'price', block.price || '')}`;
     if (block.type === 'payment') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Title', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Payment instruction (optional)', `${language}.instruction`, copy.instruction || '')}`;
-    if (block.type === 'stove') return `${pendingMediaPicker('Image', 'image', block.image, { positionPath: 'position' })}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
+    if (block.type === 'stove') return `${pendingMediaPicker('Stove image', 'image', block.image)}${field('Stove name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Price (optional)', 'price', block.price || '')}`;
     if (block.type === 'partner') return `${pendingMediaPicker('Partner logo', 'image', block.image, { positionPath: 'position' })}${field('Partner name', `${language}.title`, copy.title || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Website link', `${language}.link`, copy.link || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'testimonial') return `${pendingMediaPicker('Customer image', 'image', block.image, { positionPath: 'position' })}${field('Customer name', `${language}.title`, copy.title || '')}${field('Testimonial', `${language}.quote`, copy.quote || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Attribution', `${language}.attribution`, copy.attribution || '')}${field('Alternative text', `${language}.alt`, copy.alt || '')}`;
     if (block.type === 'cta') return `${field('Heading', `${language}.heading`, copy.heading || '', { formatPath: `${language}.format`, format: copy.format })}${field('Description', `${language}.description`, copy.description || '', { textarea: true, formatPath: `${language}.format`, format: copy.format })}${field('Button label', `${language}.buttonLabel`, copy.buttonLabel || '')}${field('Button link', `${language}.buttonLink`, copy.buttonLink || '')}`;
@@ -869,13 +915,13 @@
     form.dataset.bound = 'true';
     form.addEventListener('input', (event) => {
       const formatTarget = event.target.closest('[data-format-path][data-format-key]');
-      if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatTarget.value); return; }
+      if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatControlValue(formatTarget)); return; }
       const target = event.target.closest('[data-path]');
       if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
     });
     form.addEventListener('change', (event) => {
       const formatTarget = event.target.closest('[data-format-path][data-format-key]');
-      if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatTarget.value); return; }
+      if (formatTarget && addContentDraft) { setAt(addContentDraft.block, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatControlValue(formatTarget)); return; }
       const target = event.target.closest('[data-path]');
       if (target && addContentDraft) setAt(addContentDraft.block, target.dataset.path, target.value);
     });
@@ -885,8 +931,8 @@
   function renderAddContentModalForm() {
     ensureAddContentPanel();
     if (!addContentDraft) return;
-    const meta = sectionMeta.find(([id]) => id === addContentDraft.section);
-    $('#add-content-type-label').textContent = `Add content to ${meta?.[1] || 'this section'}`;
+    const titles = { product: 'Add briquette', payment: 'Add payment content', stove: 'Add stove', partner: 'Add partner' };
+    $('#add-content-title').textContent = titles[addContentDraft.block.type] || 'Add content';
     $('#add-content-fields').innerHTML = renderPendingBlockFields(addContentDraft.block);
   }
 
@@ -984,25 +1030,29 @@
     return output + blocks.filter((block) => !used.has(block)).map((block) => emitBlock(block)).join('');
   }
 
-  function closeAddContent() {
+  function closeAddContent({ force = false } = {}) {
+    if (!force && !confirmCloseAddContent()) return false;
     $('#add-content-backdrop').hidden = true;
     $('#add-content-modal').hidden = true;
     addContentDraft = null;
+    addContentInitialSnapshot = null;
+    syncModalScrollLock();
+    return true;
   }
   function openAddContent(section = activeSection) {
     if (!canAddContent(section)) return;
+    if (!closeAddContent() || !closeDrawer()) return;
     ensureAddContentPanel();
     pendingContentSection = section || activeSection;
     const type = { products: 'product', payment: 'payment', cookstoves: 'stove', partners: 'partner' }[pendingContentSection];
     addContentDraft = { section: pendingContentSection, block: newDynamicBlock(type) };
     addContentDraft.block.anchor = pendingContentSection;
     addContentDraft.block.placement = 'after';
-    const context = $('#add-content-context');
-    const label = sectionMeta.find(([id]) => id === pendingContentSection)?.[1] || 'the selected section';
-    if (context) context.textContent = `Complete the fields below, then save this item to ${label}.`;
+    addContentInitialSnapshot = clone(addContentDraft.block);
     renderAddContentModalForm();
     $('#add-content-backdrop').hidden = false;
     $('#add-content-modal').hidden = false;
+    syncModalScrollLock();
   }
 
   function renderGenericSectionList() {
@@ -1020,6 +1070,7 @@
 
   function renderGenericForm(open = true) {
     if (activeSection.startsWith('block:')) return renderDynamicBlockForm(open);
+    if (open) beginEditorSession();
     const content = genericContent();
     const elements = content.elements.filter((element) => (element.group || 'content') === activeSection);
     const group = elements[0]?.groupLabel || 'Page content';
@@ -1036,12 +1087,14 @@
       $('#editor-drawer').setAttribute('aria-hidden', 'false');
       $('#editor-drawer').classList.add('open');
       $('#drawer-backdrop').hidden = false;
+      syncModalScrollLock();
     }
   }
 
   function renderForm(open = true) {
     if (activePage !== 'home') return renderGenericForm(open);
     if (activeSection.startsWith('block:')) return renderDynamicBlockForm(open);
+    if (open) beginEditorSession();
     const meta = sectionMeta.find(([id]) => id === activeSection);
     const drawer = $('#editor-drawer');
     $('#drawer-title').textContent = meta[1];
@@ -1055,6 +1108,7 @@
       drawer.setAttribute('aria-hidden', 'false');
       drawer.classList.add('open');
       $('#drawer-backdrop').hidden = false;
+      syncModalScrollLock();
     }
   }
 
@@ -1140,10 +1194,14 @@
     if (match) match.classList.add('cms-admin-selected-section');
   }
 
-  function closeDrawer() {
+  function closeDrawer({ force = false } = {}) {
+    if (!force && !confirmCloseEditor()) return false;
     $('#editor-drawer').classList.remove('open');
     $('#editor-drawer').setAttribute('aria-hidden', 'true');
     $('#drawer-backdrop').hidden = true;
+    editorSession = null;
+    syncModalScrollLock();
+    return true;
   }
 
   function renderMedia() {
@@ -1163,12 +1221,14 @@
     renderMedia();
     $('#media-backdrop').hidden = false;
     $('#media-modal').hidden = false;
+    syncModalScrollLock();
   }
 
   function closeMedia() {
     $('#media-backdrop').hidden = true;
     $('#media-modal').hidden = true;
     mediaTarget = null;
+    syncModalScrollLock();
   }
 
   function openRevisions() {
@@ -1177,21 +1237,23 @@
     list.innerHTML = revisions.length ? revisions.map((revision, index) => `<div class="revision-row"><div><strong>Published version ${revisions.length - index}</strong><small>${new Date(revision.createdAt).toLocaleString()} · ${revision.language === 'sw' ? 'Kiswahili' : 'English'}</small></div><button data-action="restore-revision" data-id="${revision.id}">Restore</button></div>`).join('') : '<p class="form-intro">No previous published versions have been recorded yet. Publish once to start revision history.</p>';
     $('#revision-backdrop').hidden = false;
     $('#revision-modal').hidden = false;
+    syncModalScrollLock();
   }
 
-  function closeRevisions() { $('#revision-backdrop').hidden = true; $('#revision-modal').hidden = true; }
+  function closeRevisions() { $('#revision-backdrop').hidden = true; $('#revision-modal').hidden = true; syncModalScrollLock(); }
 
-  function closeMessages() { $('#messages-backdrop').hidden = true; $('#messages-modal').hidden = true; }
+  function closeMessages() { $('#messages-backdrop').hidden = true; $('#messages-modal').hidden = true; syncModalScrollLock(); }
   async function openMessages() {
     try {
       const result = await apiRequest('/api/messages');
       $('#messages-list').innerHTML = result.messages.length ? result.messages.map((message) => `<article class="message-row ${message.status === 'handled' ? 'is-handled' : ''}"><div><strong>${escapeHtml(message.type === 'partnership' ? 'Partnership enquiry' : 'Contact enquiry')} · ${escapeHtml(message.name)}</strong><small>${escapeHtml(message.phone)}${message.email ? ` · ${escapeHtml(message.email)}` : ''} · ${new Date(message.created_at).toLocaleString()}</small><p>${escapeHtml(message.message)}</p></div>${message.status === 'new' ? `<button data-action="mark-message" data-id="${message.id}">Mark handled</button>` : '<small>Handled</small>'}</article>`).join('') : '<p class="form-intro">No messages have been received yet.</p>';
       $('#messages-backdrop').hidden = false;
       $('#messages-modal').hidden = false;
+      syncModalScrollLock();
     } catch (error) { showToast(`Messages could not load: ${error.message}`); }
   }
 
-  function closeSettings() { $('#settings-backdrop').hidden = true; $('#settings-modal').hidden = true; }
+  function closeSettings() { $('#settings-backdrop').hidden = true; $('#settings-modal').hidden = true; syncModalScrollLock(); }
   async function openSettings() {
     try {
       const result = await apiRequest('/api/settings');
@@ -1202,6 +1264,7 @@
       $('#settings-status').textContent = '';
       $('#settings-backdrop').hidden = false;
       $('#settings-modal').hidden = false;
+      syncModalScrollLock();
     } catch (error) { showToast(`Settings could not load: ${error.message}`); }
   }
 
@@ -1290,7 +1353,7 @@
     const formatTarget = event.target.closest('[data-format-path][data-format-key]');
     if (formatTarget) {
       const draft = contentForSection(activeSection);
-      setAt(draft, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatTarget.value);
+      setAt(draft, `${formatTarget.dataset.formatPath}.${formatTarget.dataset.formatKey}`, formatControlValue(formatTarget));
       persistDraft(false);
       return;
     }
@@ -1330,7 +1393,7 @@
     }
     const action = target.dataset.action;
     if (action === 'dashboard') { showDashboard(); return; }
-    if (action === 'open-pages') { showPageEditor(); renderSectionList(); renderForm(false); return; }
+    if (action === 'open-pages') { if (!closeAddContent() || !closeDrawer()) return; showPageEditor(); renderSectionList(); renderForm(false); return; }
     if (action === 'logout') {
       apiRequest('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }).catch(() => {}).finally(() => showLogin('You have been signed out.'));
       return;
@@ -1402,7 +1465,7 @@
       if (chevron) chevron.textContent = isOpen ? '⌄' : '⌃';
       return;
     }
-    if (action === 'edit-section') { activeSection = target.dataset.section; showPageEditor(); renderSectionList(); renderForm(); updatePreview(); }
+    if (action === 'edit-section') { if (!closeAddContent() || !closeDrawer()) return; activeSection = target.dataset.section; showPageEditor(); renderSectionList(); renderForm(); updatePreview(); }
     if (action === 'save-draft') saveDraft();
     if (action === 'publish') publish();
     if (action === 'close-drawer') closeDrawer();

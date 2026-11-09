@@ -250,6 +250,7 @@ h1, h2, h3 { letter-spacing: -.045em; }
 .payment-panel-how .payment-copy { align-self: center; }
 .payment-panel-how .payment-copy h3 { max-width: 690px; margin-bottom: 14px; font-size: clamp(31px, 3.4vw, 47px); }
 .payment-panel-how .payment-copy > p { max-width: 650px; line-height: 1.65; }
+.payment-panel-how .payment-copy > [data-cms-payment-description]:empty { display: none; }
 .payment-panel-how .payment-list { max-width: 650px; margin-top: 18px; }
 .payment-panel-how .payment-row { display: grid; grid-template-columns: minmax(125px, 1fr) auto minmax(145px, 1.25fr); align-items: center; gap: 16px; }
 .payment-panel-how .payment-row small { color: var(--muted); font-size: 10px; line-height: 1.35; }

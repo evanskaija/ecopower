@@ -150,13 +150,30 @@ function withBlocks(content, blocks) {
 }
 function currentBlockRecord(row) { return withBlocks(parseJson(row.content_json), parseJson(row.blocks_json)); }
 const TIRDO_PARTNER_IMAGE = 'EcoPower_all_extracted_images/TIRDO_logo_from_EcoPower_PDF.png';
+const REMOVED_PAYMENT_DESCRIPTIONS = new Set([
+  ['Or pay cash when your order arrives.', 'After paying, send the payment message on WhatsApp to 0784 017 225 so we can confirm your order.'].join(' '),
+  ['Au lipa cash oda yako inapofika.', 'Baada ya kulipa, tuma ujumbe wa malipo WhatsApp kwa 0784 017 225 ili tuthibitishe oda yako.'].join(' ')
+]);
 function normalizeHomeContent(slug, content) {
-  if (slug !== 'home' || !content?.images || !Array.isArray(content.images.partnerLogos)) return content;
-  if (content.images.partnerLogos.some((item) => item?.image === TIRDO_PARTNER_IMAGE)) return content;
-  content.images = {
-    ...content.images,
-    partnerLogos: [...content.images.partnerLogos, { image: TIRDO_PARTNER_IMAGE, en: { alt: 'TIRDO' }, sw: { alt: 'TIRDO' }, position: 'center' }]
-  };
+  if (slug !== 'home' || !content || typeof content !== 'object') return content;
+  const ordering = content.ordering;
+  const englishCopy = ordering?.en;
+  const swahiliCopy = ordering?.sw;
+  const cleanedEnglishCopy = englishCopy && REMOVED_PAYMENT_DESCRIPTIONS.has(englishCopy.paymentDescription) ? { ...englishCopy, paymentDescription: '' } : englishCopy;
+  const cleanedSwahiliCopy = swahiliCopy && REMOVED_PAYMENT_DESCRIPTIONS.has(swahiliCopy.paymentDescription) ? { ...swahiliCopy, paymentDescription: '' } : swahiliCopy;
+  if (cleanedEnglishCopy !== englishCopy || cleanedSwahiliCopy !== swahiliCopy) {
+    content.ordering = {
+      ...ordering,
+      ...(cleanedEnglishCopy ? { en: cleanedEnglishCopy } : {}),
+      ...(cleanedSwahiliCopy ? { sw: cleanedSwahiliCopy } : {})
+    };
+  }
+  if (content.images && Array.isArray(content.images.partnerLogos) && !content.images.partnerLogos.some((item) => item?.image === TIRDO_PARTNER_IMAGE)) {
+    content.images = {
+      ...content.images,
+      partnerLogos: [...content.images.partnerLogos, { image: TIRDO_PARTNER_IMAGE, en: { alt: 'TIRDO' }, sw: { alt: 'TIRDO' }, position: 'center' }]
+    };
+  }
   return content;
 }
 function blockCopy(block, language) { return block?.[language] || block?.en || block?.sw || {}; }

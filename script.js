@@ -96,7 +96,6 @@ const staticSwahili = {
   'Scan with M-Pesa or any banking app': 'Scan kwa M-Pesa au app yoyote ya benki',
   'Scan with any banking or mobile money app': 'Scan kwa benki au simu yoyote',
   'Pay by Lipa Namba from any network or bank': 'Lipa Namba kutoka mtandao au benki yoyote',
-  'Or pay cash when your order arrives. After paying, send the payment message on WhatsApp to 0784 017 225 so we can confirm your order.': 'Au lipa cash oda yako inapofika. Baada ya kulipa, tuma ujumbe wa malipo WhatsApp kwa 0784 017 225 ili tuthibitishe oda yako.',
   'M-Pesa Lipa Namba': 'M-Pesa Lipa Namba',
   'CRDB Lipa Namba': 'CRDB Lipa Namba',
   'Shows as ECOPOWER SOLUTIONS LTD 1': 'Inaonekana kama ECOPOWER SOLUTIONS LTD 1',
@@ -711,9 +710,12 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     orderingCopy.steps?.forEach((step, index) => { cmsText(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.title); cmsText(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.description); cmsApplyTextFormat(`#how-it-works .step-card:nth-child(${index + 1}) h3`, step.format); cmsApplyTextFormat(`#how-it-works .step-card:nth-child(${index + 1}) p`, step.format); });
     cmsText('#how-it-works .payment-copy .eyebrow', orderingCopy.paymentEyebrow);
     cmsText('#how-it-works .payment-copy h3', orderingCopy.paymentTitle);
-    cmsText('#how-it-works .payment-copy > p', orderingCopy.paymentDescription);
+    const paymentDescription = document.querySelector('#how-it-works .payment-copy > [data-cms-payment-description]');
+    if (paymentDescription && orderingCopy.paymentDescription) {
+      cmsText('[data-cms-payment-description]', orderingCopy.paymentDescription, false, paymentDescription.parentElement);
+      cmsApplyTextFormat('[data-cms-payment-description]', orderingCopy.paymentFormat, paymentDescription.parentElement);
+    } else if (paymentDescription) paymentDescription.remove();
     cmsApplyTextFormat('#how-it-works .payment-copy h3', orderingCopy.paymentFormat);
-    cmsApplyTextFormat('#how-it-works .payment-copy > p', orderingCopy.paymentFormat);
     const rows = document.querySelectorAll('#how-it-works .payment-row');
     [[orderingCopy.mpesaLabel, orderingCopy.mpesaNumber, orderingCopy.mpesaNote], [orderingCopy.crdbLabel, orderingCopy.crdbNumber, orderingCopy.crdbNote]].forEach((row, index) => { if (!rows[index]) return; cmsText('span', row[0], false, rows[index]); cmsText('strong', row[1], false, rows[index]); cmsText('small', row[2], false, rows[index]); });
   }

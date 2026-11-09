@@ -779,6 +779,8 @@ const setLanguage = (language) => {
   if (code) code.textContent = safeLanguage.toUpperCase();
   if (currentFlag) currentFlag.src = safeLanguage === 'sw' ? 'Tanzania.webp' : 'United-States-of-America.webp';
   if (secondaryFlag) secondaryFlag.src = safeLanguage === 'sw' ? 'United-States-of-America.webp' : 'Tanzania.webp';
+  if (currentFlag) currentFlag.alt = safeLanguage === 'sw' ? 'Swahili' : 'English';
+  languageToggle?.setAttribute('aria-label', safeLanguage === 'sw' ? 'Language: Swahili. Choose language' : 'Language: English. Choose language');
   document.querySelectorAll('.language-menu button[data-language]').forEach((button) => button.classList.toggle('selected', button.dataset.language === safeLanguage));
 };
 

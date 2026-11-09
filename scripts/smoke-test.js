@@ -29,10 +29,12 @@ async function main() {
   assert.equal(adminHtml.includes('data-action="media-library"'), false, 'Dashboard should not expose a standalone Media Library action');
   assert.equal(adminHtml.includes('Manage Media'), false, 'Dashboard should not expose a Manage Media action');
   assert.match(adminHtml, /id="page-editor-view" hidden/, 'page editor should start hidden until it is intentionally opened');
+  assert.match(adminHtml, /body class="admin-shell dashboard-mode"/, 'dashboard should start in a media-hidden mode');
   assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
   assert.match(adminStyles, /#media-backdrop[^\n]*z-index: 100/, 'Media Library backdrop should sit above Add Content');
   assert.match(adminStyles, /#media-modal[^\n]*z-index: 101/, 'Media Library should sit above Add Content');
+  assert.match(adminStyles, /dashboard-mode #media-backdrop[^\n]*display: none !important/, 'Dashboard mode should hide the Media Library box');
   assert.match(adminSource, /document\.body\.append\(backdrop\)/, 'Media Library should be portaled to the document body');
   assert.match(adminSource, /function resetTransientModals\(\)/, 'dashboard startup should reset transient modal state');
   assert.match(adminSource, /window\.addEventListener\('pageshow', resetTransientModals\)/, 'browser-restored dashboard should keep transient modals closed');

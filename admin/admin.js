@@ -362,6 +362,7 @@
 
   function showLogin(errorMessage = '') {
     resetTransientModals();
+    document.body.classList.add('dashboard-mode');
     currentUser = null;
     $('.admin-app').classList.add('is-locked');
     $('#login-screen').hidden = false;
@@ -392,6 +393,7 @@
     if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     activePage = slug;
     isDashboard = false;
+    document.body.classList.remove('dashboard-mode');
     activeSection = slug === 'home' ? 'hero' : 'generic-text';
     $('#dashboard-view').hidden = true;
     $('#page-editor-view').hidden = false;
@@ -422,6 +424,7 @@
   function showDashboard() {
     if (!closeMedia() || !closeAddContent() || !closeDrawer()) return;
     isDashboard = true;
+    document.body.classList.add('dashboard-mode');
     resetTransientModals();
     $('#dashboard-view').hidden = false;
     $('#page-editor-view').hidden = true;
@@ -433,6 +436,7 @@
   }
   function showPageEditor() {
     isDashboard = false;
+    document.body.classList.remove('dashboard-mode');
     $('#dashboard-view').hidden = true;
     $('#page-editor-view').hidden = false;
     document.querySelectorAll('.admin-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.action === 'toggle-pages'));

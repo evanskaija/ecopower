@@ -145,6 +145,8 @@ button { cursor: pointer; }
 .preview-hint { position: absolute; right: 20px; bottom: 16px; padding: 7px 9px; border-radius: 6px; background: rgba(9,43,32,.85); color: rgba(255,255,255,.86); font-size: 9px; pointer-events: none; }
 
 .admin-drawer-backdrop, .modal-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(3, 22, 15, .38); backdrop-filter: blur(2px); }
+#media-backdrop { z-index: 100; }
+#media-modal { z-index: 101; }
 .admin-shell.modal-open { overflow: hidden; }
 .admin-drawer-backdrop[hidden], .modal-backdrop[hidden], .admin-modal[hidden] { display: none; }
 .admin-drawer { position: fixed; top: 0; right: 0; z-index: 81; display: flex; flex-direction: column; width: min(510px, 100vw); height: 100vh; background: #fff; box-shadow: -18px 0 48px rgba(3,22,15,.18); transform: translateX(100%); transition: transform .24s ease; }

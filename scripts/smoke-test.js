@@ -28,6 +28,8 @@ async function main() {
   assert.equal(adminHtml.includes('add-content-context'), false, 'Add Content should not show repeated introductory copy');
   assert.match(adminStyles, /add-content-modal[^\n]*max-height: 90vh/, 'Add Content should fit within the viewport');
   assert.match(adminStyles, /add-content-fields[^\n]*overflow-y: auto/, 'Add Content should have one scrollable form area');
+  assert.match(adminStyles, /#media-backdrop[^\n]*z-index: 100/, 'Media Library backdrop should sit above Add Content');
+  assert.match(adminStyles, /#media-modal[^\n]*z-index: 101/, 'Media Library should sit above Add Content');
   assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
   assert.match(adminSource, /if \(!closeMedia\(\) \|\| !closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'Add Content should close the Media Library before opening');
   assert.match(adminSource, /if \(type === 'stove'\) \{ block\.image = ''; /, 'new stoves should start without a selected image');

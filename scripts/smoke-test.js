@@ -254,6 +254,24 @@ async function main() {
     result = await request('/api/public/products');
     assert.deepEqual(result.body.published.en.content.blocks[0].cards.map((card) => card.id), ['card-b', 'card-a'], 'card reorder should persist after publish and refresh');
 
+    const richHomeBlocks = [
+      { id: 'home-smoke-product', type: 'product', visible: true, image: `media:${productImage.id}`, price: 'TZS 99,000', link: 'https://wa.me/255784017225', en: { kicker: 'For kitchens', title: 'Smoke product', description: 'Product description', buttonLabel: 'Order product', alt: 'Smoke product', format: { size: 'large', weight: 'bold', color: 'forest', align: 'center', heading: 'h3' } }, sw: { title: 'Bidhaa ya majaribio', description: 'Maelezo ya bidhaa', buttonLabel: 'Agiza bidhaa', alt: 'Bidhaa ya majaribio' } },
+      { id: 'home-smoke-partner', type: 'partner', visible: true, image: `media:${galleryImage.id}`, en: { title: 'Smoke partner', description: 'Partner description', link: 'https://example.com/partner', alt: 'Smoke partner logo' }, sw: { title: 'Mshirika wa majaribio', description: 'Maelezo ya mshirika', alt: 'Nembo ya mshirika' } },
+      { id: 'home-smoke-testimonial', type: 'testimonial', visible: true, image: `media:${heroImage.id}`, en: { title: 'Smoke customer', quote: 'A durable customer quote.', attribution: 'Kunduchi', alt: 'Smoke customer' }, sw: { title: 'Mteja wa majaribio', quote: 'Ushuhuda wa mteja.', attribution: 'Kunduchi', alt: 'Mteja wa majaribio' } },
+      { id: 'home-smoke-cta', type: 'cta', visible: true, en: { heading: 'Smoke CTA', description: 'Call to action description', buttonLabel: 'Contact EcoPower', buttonLink: 'https://wa.me/255784017225' }, sw: { heading: 'CTA ya majaribio', description: 'Maelezo ya CTA', buttonLabel: 'Wasiliana na EcoPower', buttonLink: 'https://wa.me/255784017225' } }
+    ];
+    result = await request('/api/pages/home/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: { blocks: richHomeBlocks } }) });
+    assert.equal(result.response.status, 200, 'product, partner, testimonial and CTA blocks should save');
+    result = await request('/api/pages/home');
+    assert.equal(result.body.draft.en.content.blocks[0].en.format.size, 'large', 'safe text formatting should persist in the draft');
+    result = await request('/api/pages/home/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(result.response.status, 200, 'new Home block types should publish');
+    result = await request('/api/public/home');
+    assert.deepEqual(result.body.published.en.content.blocks.map((block) => block.type), ['product', 'partner', 'testimonial', 'cta'], 'new Home block types should remain after publishing');
+    const invalidFormatBlock = { ...richHomeBlocks[0], id: 'home-invalid-format', en: { ...richHomeBlocks[0].en, format: { size: 'unsafe-css-value' } } };
+    result = await request('/api/pages/home/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: { blocks: [invalidFormatBlock] } }) });
+    assert.equal(result.response.status, 400, 'unsupported formatting values should be rejected');
+
     result = await request('/api/pages/about/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: { blocks: [] } }) });
     assert.equal(result.response.status, 200, 'deleted test section should save');
     await request('/api/pages/about/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'sw', content: { blocks: [] } }) });

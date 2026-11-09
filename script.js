@@ -471,6 +471,23 @@ const cmsImageList = (selector, records = []) => records.forEach((record, index)
   if (record.position) image.style.objectPosition = record.position;
 });
 const cmsBlockCopy = (block, language) => block?.[language] || block?.en || block?.sw || {};
+const cmsFormatClass = (format = {}) => {
+  const allowed = {
+    size: ['small', 'medium', 'large', 'display'],
+    weight: ['regular', 'bold'],
+    style: ['normal', 'italic'],
+    color: ['ink', 'forest', 'muted', 'accent'],
+    align: ['left', 'center', 'right'],
+    spacing: ['tight', 'normal', 'loose']
+  };
+  return Object.entries(allowed).map(([key, values]) => values.includes(format[key]) ? `cms-format-${key}-${format[key]}` : '').filter(Boolean).join(' ');
+};
+const cmsFormatTag = (format = {}, fallback = 'p') => ['p', 'h2', 'h3'].includes(format.heading) ? format.heading : fallback;
+const cmsFormattedText = (value, format = {}, fallbackTag = 'p') => {
+  if (!value) return '';
+  const tag = cmsFormatTag(format, fallbackTag);
+  return `<${tag} class="${cmsFormatClass(format)}">${cmsEscape(value)}</${tag}>`;
+};
 const cmsSafeHref = (value = '') => {
   const href = String(value || '').trim();
   if (/^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+|#[^\s]*|\/[^\s]*|[a-z0-9][a-z0-9_-]*\.html(?:[?#].*)?)$/i.test(href)) return href;
@@ -483,15 +500,21 @@ const cmsBlockImage = (value, copy, className = '', position = 'center') => {
 };
 const cmsBlockMarkup = (block, language) => {
   const copy = cmsBlockCopy(block, language);
-  if (block.type === 'text') return `<section class="cms-dynamic-block cms-dynamic-text section section-white"><div class="page-width cms-dynamic-copy">${copy.heading ? `<p class="eyebrow">${cmsEscape(copy.subheading || '')}</p><h2>${cmsEscape(copy.heading)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div></section>`;
-  if (block.type === 'image') return `<section class="cms-dynamic-block cms-dynamic-image section section-cream"><div class="page-width cms-dynamic-image-grid"><figure>${cmsBlockImage(block.image, copy, '', block.position)}${copy.caption ? `<figcaption>${cmsEscape(copy.caption)}</figcaption>` : ''}</figure><div class="cms-dynamic-copy">${copy.title ? `<h2>${cmsEscape(copy.title)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div></div></section>`;
+  if (block.type === 'text') return `<section class="cms-dynamic-block cms-dynamic-text section section-white"><div class="page-width cms-dynamic-copy">${copy.heading ? `<p class="eyebrow">${cmsEscape(copy.subheading || '')}</p>${cmsFormattedText(copy.heading, copy.format, 'h2')}` : ''}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div></section>`;
+  if (block.type === 'image') return `<section class="cms-dynamic-block cms-dynamic-image section section-cream"><div class="page-width cms-dynamic-image-grid"><figure>${cmsBlockImage(block.image, copy, '', block.position)}${copy.caption ? `<figcaption class="${cmsFormatClass(copy.format)}">${cmsEscape(copy.caption)}</figcaption>` : ''}</figure><div class="cms-dynamic-copy">${cmsFormattedText(copy.title, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div></div></section>`;
   if (block.type === 'imageText') {
     const image = `<div class="cms-dynamic-image-text-media">${cmsBlockImage(block.image, copy, '', block.position)}</div>`;
-    const text = `<div class="cms-dynamic-copy">${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}${cmsBlockButton(copy)}</div>`;
+    const text = `<div class="cms-dynamic-copy">${cmsFormattedText(copy.heading, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div>`;
     return `<section class="cms-dynamic-block cms-dynamic-image-text section section-white"><div class="page-width cms-dynamic-image-text-grid layout-${block.layout === 'right' ? 'right' : 'left'}">${block.layout === 'right' ? `${text}${image}` : `${image}${text}`}</div></section>`;
   }
-  if (block.type === 'cards') return `<section class="cms-dynamic-block cms-dynamic-cards section section-cream"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}</div>${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}</div><div class="cms-dynamic-card-grid">${(block.cards || []).map((card) => { const item = cmsBlockCopy(card, language); return `<article class="cms-dynamic-card">${card.image ? cmsBlockImage(card.image, item, '', card.position) : ''}${item.title ? `<h3>${cmsEscape(item.title)}</h3>` : ''}${item.description ? `<p>${cmsEscape(item.description)}</p>` : ''}</article>`; }).join('')}</div></div></section>`;
-  if (block.type === 'gallery') return `<section class="cms-dynamic-block cms-dynamic-gallery section section-white"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${copy.heading ? `<h2>${cmsEscape(copy.heading)}</h2>` : ''}</div>${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}</div><div class="cms-dynamic-gallery-grid">${(block.images || []).map((item) => { const imageCopy = cmsBlockCopy(item, language); return `<figure>${cmsBlockImage(item.image, imageCopy, '', item.position)}${imageCopy.caption ? `<figcaption>${cmsEscape(imageCopy.caption)}</figcaption>` : ''}</figure>`; }).join('')}</div></div></section>`;
+  if (block.type === 'cards' || block.type === 'product') {
+    const cards = block.type === 'product' ? [block] : (block.cards || []);
+    return `<section class="cms-dynamic-block cms-dynamic-cards section section-cream"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${cmsFormattedText(copy.heading, copy.format, 'h2')}</div>${cmsFormattedText(copy.description, copy.format, 'p')}</div><div class="cms-dynamic-card-grid">${cards.map((card) => { const item = block.type === 'product' ? copy : cmsBlockCopy(card, language); const orderLink = block.type === 'product' ? block.link : (item.buttonLink || copy.buttonLink); return `<article class="cms-dynamic-card">${card.image ? cmsBlockImage(card.image, item, '', card.position) : ''}${item.kicker ? `<p class="card-kicker">${cmsEscape(item.kicker)}</p>` : ''}${cmsFormattedText(item.title || item.name, item.format || copy.format, 'h3')}${cmsFormattedText(item.description, item.format || copy.format, 'p')}${item.price ? `<strong class="cms-dynamic-price">${cmsEscape(item.price)}</strong>` : ''}${block.type === 'product' || item.buttonLabel ? cmsBlockButton({ buttonLabel: item.buttonLabel || copy.buttonLabel, buttonLink: orderLink }) : ''}</article>`; }).join('')}</div></div></section>`;
+  }
+  if (block.type === 'gallery') return `<section class="cms-dynamic-block cms-dynamic-gallery section section-white"><div class="page-width"><div class="section-heading"><div>${copy.subheading ? `<p class="eyebrow">${cmsEscape(copy.subheading)}</p>` : ''}${cmsFormattedText(copy.heading, copy.format, 'h2')}</div>${cmsFormattedText(copy.description, copy.format, 'p')}</div><div class="cms-dynamic-gallery-grid">${(block.images || []).map((item) => { const imageCopy = cmsBlockCopy(item, language); return `<figure>${cmsBlockImage(item.image, imageCopy, '', item.position)}${imageCopy.caption ? `<figcaption class="${cmsFormatClass(imageCopy.format || copy.format)}">${cmsEscape(imageCopy.caption)}</figcaption>` : ''}</figure>`; }).join('')}</div></div></section>`;
+  if (block.type === 'partner') return `<section class="cms-dynamic-block cms-dynamic-partner section section-white"><div class="page-width cms-dynamic-partner-card">${block.image ? cmsBlockImage(block.image, copy, '', block.position) : ''}<div>${cmsFormattedText(copy.title || copy.name, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${copy.buttonLabel ? cmsBlockButton(copy) : (copy.link ? `<a class="text-link" href="${cmsEscape(cmsSafeHref(copy.link))}">Visit partner website →</a>` : '')}</div></div></section>`;
+  if (block.type === 'testimonial') return `<section class="cms-dynamic-block cms-dynamic-testimonial section section-cream"><div class="page-width cms-dynamic-testimonial-card">${block.image ? cmsBlockImage(block.image, copy, '', block.position) : ''}<blockquote class="${cmsFormatClass(copy.format)}">${cmsEscape(copy.quote || copy.description || '')}</blockquote>${copy.title ? `<cite><strong>${cmsEscape(copy.title)}</strong>${copy.attribution ? `, ${cmsEscape(copy.attribution)}` : ''}</cite>` : ''}</div></section>`;
+  if (block.type === 'cta') return `<section class="cms-dynamic-block cms-dynamic-cta section section-green"><div class="page-width cms-dynamic-copy">${cmsFormattedText(copy.heading || copy.title, copy.format, 'h2')}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div></section>`;
   return '';
 };
 const cmsHomeSectionSelectors = {

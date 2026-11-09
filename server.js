@@ -123,11 +123,20 @@ function safeJson(value) { return JSON.stringify(value ?? {}); }
 function parseJson(value) { try { return JSON.parse(value); } catch { return {}; } }
 function publicUrlFor(fileName) { return `/uploads/published/${encodeURIComponent(fileName)}`; }
 function cleanEmail(value) { return String(value || '').trim().toLowerCase(); }
-const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery']);
+const DYNAMIC_BLOCK_TYPES = new Set(['text', 'image', 'imageText', 'cards', 'gallery', 'product', 'partner', 'testimonial', 'cta']);
 const BLOCK_ID = /^[a-z0-9][a-z0-9_-]{1,79}$/i;
 const BLOCK_IMAGE_LIMIT = 50;
 const BLOCK_CARD_LIMIT = 30;
 const BLOCK_TEXT_LIMIT = 4000;
+const BLOCK_FORMAT_CHOICES = Object.freeze({
+  size: new Set(['small', 'medium', 'large', 'display']),
+  weight: new Set(['regular', 'bold']),
+  style: new Set(['normal', 'italic']),
+  color: new Set(['ink', 'forest', 'muted', 'accent']),
+  align: new Set(['left', 'center', 'right']),
+  spacing: new Set(['tight', 'normal', 'loose']),
+  heading: new Set(['p', 'h2', 'h3'])
+});
 function splitBlocks(content) {
   const source = content && typeof content === 'object' && !Array.isArray(content) ? { ...content } : {};
   const blocks = Array.isArray(source.blocks) ? source.blocks : [];
@@ -146,22 +155,33 @@ function validateBlockText(value, label, max = BLOCK_TEXT_LIMIT) {
   if (value.length > max) return `${label} is too long.`;
   return null;
 }
+function validateBlockFormat(format, label) {
+  if (format === undefined) return null;
+  if (!format || typeof format !== 'object' || Array.isArray(format)) return `${label} formatting is invalid.`;
+  for (const [key, choices] of Object.entries(BLOCK_FORMAT_CHOICES)) {
+    if (format[key] !== undefined && !choices.has(format[key])) return `${label}.${key} is not supported.`;
+  }
+  return null;
+}
 function validateBlock(block, index, slug) {
   if (!block || typeof block !== 'object' || Array.isArray(block)) return `Invalid dynamic block ${index + 1} on ${slug}.`;
   if (!DYNAMIC_BLOCK_TYPES.has(block.type)) return `Unsupported dynamic block type on ${slug}.`;
   if (typeof block.id !== 'string' || !BLOCK_ID.test(block.id)) return `Dynamic block ${index + 1} has an invalid ID.`;
   if (block.visible !== undefined && typeof block.visible !== 'boolean') return `Dynamic block ${block.id} visibility must be boolean.`;
   if (block.type === 'imageText' && !['left', 'right'].includes(block.layout || 'left')) return `Dynamic block ${block.id} image alignment is invalid.`;
-  if (['image', 'imageText'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
+  if (['image', 'imageText', 'product', 'partner', 'testimonial'].includes(block.type) && (typeof block.image !== 'string' || !block.image)) return `Dynamic block ${block.id} needs an image.`;
   if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic block ${block.id} has an invalid image reference.`;
   const languages = ['en', 'sw'];
   for (const language of languages) {
     const copy = blockCopy(block, language);
-    for (const [key, max] of [['heading', 180], ['subheading', 180], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['buttonLabel', 100], ['buttonLink', 1000], ['alt', 250], ['caption', 300]]) {
+    for (const [key, max] of [['heading', 180], ['subheading', 180], ['kicker', 120], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['quote', BLOCK_TEXT_LIMIT], ['attribution', 180], ['buttonLabel', 100], ['buttonLink', 1000], ['link', 1000], ['alt', 250], ['caption', 300]]) {
       const error = validateBlockText(copy[key], `Dynamic block ${block.id} ${language}.${key}`, max);
       if (error) return error;
     }
+    const formatError = validateBlockFormat(copy.format, `Dynamic block ${block.id} ${language}`);
+    if (formatError) return formatError;
     if (copy.buttonLink && !SAFE_HREF.test(copy.buttonLink)) return `Dynamic block ${block.id} has an invalid button link.`;
+    if (copy.link && !SAFE_HREF.test(copy.link)) return `Dynamic block ${block.id} has an invalid website link.`;
   }
   if (block.type === 'cards') {
     if (!Array.isArray(block.cards) || block.cards.length > BLOCK_CARD_LIMIT) return `Dynamic block ${block.id} can contain at most ${BLOCK_CARD_LIMIT} cards.`;
@@ -170,10 +190,13 @@ function validateBlock(block, index, slug) {
       if (card.image && (!SAFE_IMAGE.test(card.image) || validateImageReference(card.image))) return `Dynamic block ${block.id} card ${card.id} has an invalid image reference.`;
       for (const language of languages) {
         const copy = blockCopy(card, language);
-        for (const [key, max] of [['title', 180], ['description', BLOCK_TEXT_LIMIT], ['alt', 250]]) {
+        for (const [key, max] of [['kicker', 120], ['title', 180], ['description', BLOCK_TEXT_LIMIT], ['price', 80], ['buttonLabel', 100], ['buttonLink', 1000], ['alt', 250]]) {
           const error = validateBlockText(copy[key], `Dynamic block ${block.id} card ${card.id} ${language}.${key}`, max);
           if (error) return error;
         }
+        if (copy.buttonLink && !SAFE_HREF.test(copy.buttonLink)) return `Dynamic block ${block.id} card ${card.id} has an invalid order link.`;
+        const formatError = validateBlockFormat(copy.format, `Dynamic block ${block.id} card ${card.id} ${language}`);
+        if (formatError) return formatError;
       }
     }
   }
@@ -191,6 +214,12 @@ function validateBlock(block, index, slug) {
       }
     }
   }
+  if (block.type === 'product') {
+    if (block.image && (!SAFE_IMAGE.test(block.image) || validateImageReference(block.image))) return `Dynamic product block ${block.id} has an invalid image reference.`;
+    if (block.price !== undefined && (typeof block.price !== 'string' || block.price.length > 80)) return `Dynamic product block ${block.id} has an invalid price.`;
+    if (block.link && !SAFE_HREF.test(block.link)) return `Dynamic product block ${block.id} has an invalid order link.`;
+  }
+  if (block.type === 'partner' && block.link && !SAFE_HREF.test(block.link)) return `Dynamic partner block ${block.id} has an invalid website link.`;
   return null;
 }
 function validateBlocks(slug, blocks) {
@@ -393,8 +422,14 @@ app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'ed
   const validationError = await validateContent(req.params.slug, req.body.content);
   if (validationError) return res.status(400).json({ error: validationError });
   const language = req.body.language === 'sw' ? 'sw' : 'en';
+  const previous = currentContent(req.params.slug, 'draft', language);
+  const previousOrdering = previous?.content?.ordering?.[language] || previous?.content?.ordering?.en || {};
+  const nextOrdering = req.body.content?.ordering?.[language] || req.body.content?.ordering?.en || {};
+  const changedPaymentFields = ['mpesaNumber', 'crdbNumber'].filter((key) => previousOrdering[key] !== undefined && nextOrdering[key] !== previousOrdering[key]);
+  if (changedPaymentFields.length && !['owner', 'admin'].includes(req.user.role)) return res.status(403).json({ error: 'Only an owner or administrator may change payment account numbers.' });
   const result = saveContent(req.params.slug, 'draft', req.body.content, req.user.id, language);
   audit(req, 'draft.save', req.params.slug, { language, version: result.version });
+  if (changedPaymentFields.length) audit(req, 'payment.details.update', req.params.slug, { language, fields: changedPaymentFields });
   res.json({ ok: true, ...result, draft: allContent(req.params.slug, 'draft') });
 });
 

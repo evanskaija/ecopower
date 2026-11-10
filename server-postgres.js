@@ -629,7 +629,7 @@ app.post('/api/media/client-upload', requireAuth, requireRole('owner', 'admin', 
     const upload = parseClientUploadPath(payload.pathname);
     if (upload.scope !== 'public') return res.status(400).json({ error: 'Website images must use the public Blob store.' });
     if (payload.multipart) return res.status(400).json({ error: 'Multipart client uploads are not supported for images.' });
-    const { handleUpload } = require('@vercel/blob');
+    const { handleUpload } = require('@vercel/blob/client');
     const result = await handleUpload({
       token: PUBLIC_BLOB_TOKEN,
       request: req,

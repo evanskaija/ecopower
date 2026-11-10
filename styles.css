@@ -1838,3 +1838,42 @@ html[data-theme="dark"] body {
   .nav-actions .theme-toggle { flex: 0 0 40px; width: 40px; height: 40px; }
   .nav-actions .button-small { flex: 1 1 140px; min-width: 0; white-space: nowrap; }
 }
+
+/* Dark-mode contrast corrections for price, WAKALA and payment surfaces. */
+:root[data-theme="dark"] .price-panel {
+  border-color: rgba(166, 229, 187, .28);
+  background: #24362c;
+  color: #e8f5ed;
+}
+:root[data-theme="dark"] .price-panel-head span,
+:root[data-theme="dark"] .price-panel-note { color: #b9cec0; }
+:root[data-theme="dark"] .price-panel-grid div { background: #12241b; }
+:root[data-theme="dark"] .price-panel-grid small { color: #b9cec0; }
+:root[data-theme="dark"] .price-panel-grid strong { color: var(--lime); }
+
+:root[data-theme="dark"] .product-card .card-body h3,
+:root[data-theme="dark"] .product-card .price-row strong { color: #f4fff7; }
+:root[data-theme="dark"] .home-stove-price,
+:root[data-theme="dark"] .stove-card .price-row strong,
+:root[data-theme="dark"] .bundle-panel .price-row strong { color: var(--lime); }
+:root[data-theme="dark"] .bundle-panel h3 { color: #e8f5ed; }
+:root[data-theme="dark"] .bundle-panel .price-row span,
+:root[data-theme="dark"] .bundle-included { color: #b9cec0; }
+
+:root[data-theme="dark"] .partners-wakala-card .wakala-card strong,
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a,
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a strong { color: #e8f5ed; }
+:root[data-theme="dark"] .partners-wakala-card .wakala-card span,
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a > span:not(.location-dot) { color: var(--fresh); }
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a { border-color: rgba(84, 211, 139, .32); }
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a small { background: #0f6a49; color: #f4fff7; }
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a small:last-child { border-color: rgba(84, 211, 139, .5); background: transparent; color: #e8f5ed; }
+:root[data-theme="dark"] .contact-wakala-card .location-dot { color: var(--lime); }
+
+:root[data-theme="dark"] .payment-row strong,
+:root[data-theme="dark"] .contact-payment-panel .payment-row strong { color: var(--lime); }
+:root[data-theme="dark"] .contact-payment-panel .payment-row { border: 1px solid rgba(84, 211, 139, .16); background: #12241b; }
+:root[data-theme="dark"] .contact-payment-panel .payment-row span { color: #c8ded0; }
+:root[data-theme="dark"] .contact-payment-panel .payment-row small { color: #a9c0b1; }
+:root[data-theme="dark"] .data-table th { color: #f4fff7; }
+:root[data-theme="dark"] .data-table td strong { color: var(--lime); }

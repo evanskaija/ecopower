@@ -23,6 +23,8 @@ async function main() {
   const adminHtml = fs.readFileSync(path.join(ROOT, 'admin', 'index.html'), 'utf8');
   const adminSource = fs.readFileSync(path.join(ROOT, 'admin', 'admin.js'), 'utf8');
   const adminStyles = fs.readFileSync(path.join(ROOT, 'admin', 'admin.css'), 'utf8');
+  const publicSource = fs.readFileSync(path.join(ROOT, 'script.js'), 'utf8');
+  const publicStyles = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
   assert.equal(adminHtml.includes('Choose a content block'), false, 'Home Add Content should not show the old chooser');
   assert.equal((adminHtml.match(/data-block-type=/g) || []).length, 0, 'Home Add Content should not expose block type buttons');
   assert.equal(adminHtml.includes('add-content-context'), false, 'Add Content should not show repeated introductory copy');
@@ -45,6 +47,14 @@ async function main() {
   assert.match(adminSource, /if \(!closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'switching editors should close the previous window');
   assert.match(adminSource, /if \(!closeMedia\(\) \|\| !closeAddContent\(\) \|\| !closeDrawer\(\)\) return;/, 'Add Content should close the Media Library before opening');
   assert.match(adminSource, /if \(type === 'stove'\) \{ block\.image = ''; /, 'new stoves should start without a selected image');
+  assert.match(publicSource, /cmsHomeRenderStoves\(cmsHomeCollectionItems\(stoves, stoveBlocks\), lang\)/, 'Home stoves should merge CMS records into the base stove collection');
+  assert.match(publicSource, /!homeCollectionBlockIds\.has\(block\.id\)/, 'anchored Home collection records should skip the generic block renderer');
+  assert.match(publicSource, /cmsHomeRenderPayments\(paymentBlocks, lang\)/, 'Home payments should use the existing payment layout');
+  assert.match(publicSource, /cmsHomePaymentFeatureMarkup|cms-payment-feature-image/, 'payment images should render in the shared payment panel feature area');
+  assert.match(publicSource, /cmsHomeRenderPartners\(partnerBlocks, lang\)/, 'Home partners should use the existing partner layout');
+  assert.match(publicStyles, /\.home-stove-grid \{ display: grid; grid-template-columns: repeat\(4, 1fr\)/, 'stoves should use a four-column desktop grid');
+  assert.match(publicStyles, /\.home-stove-grid \{ grid-template-columns: 1fr; gap: 12px; \}/, 'stoves should collapse to one column on mobile');
+  assert.match(publicStyles, /\.payment-panel-how\.has-cms-payment-image/, 'payment images should keep the shared payment panel layout');
   assert.match(adminSource, /format-advanced/, 'advanced text formatting should be expandable');
   for (const section of ['products', 'payment', 'cookstoves', 'partners']) assert.match(adminSource, new RegExp(`canAddContent\\(section\\)|${section}`), `${section} should remain an Add Content section`);
   for (const type of ['product', 'payment', 'stove', 'partner']) assert.match(adminSource, new RegExp(`block\.type === '${type}'`), `${type} Add Content form should exist`);
@@ -284,10 +294,11 @@ async function main() {
     assert.deepEqual(result.body.published.en.content.blocks[0].cards.map((card) => card.id), ['card-b', 'card-a'], 'card reorder should persist after publish and refresh');
 
     const richHomeBlocks = [
-      { id: 'home-smoke-product', type: 'product', visible: true, image: `media:${productImage.id}`, price: 'TZS 99,000', link: 'https://wa.me/255784017225', en: { kicker: 'For kitchens', title: 'Smoke product', description: 'Product description', buttonLabel: 'Order product', alt: 'Smoke product', format: { size: 'large', weight: 'bold', color: 'forest', align: 'center', heading: 'h3', font: 'sans' } }, sw: { title: 'Bidhaa ya majaribio', description: 'Maelezo ya bidhaa', buttonLabel: 'Agiza bidhaa', alt: 'Bidhaa ya majaribio' } },
-      { id: 'home-smoke-payment', type: 'payment', visible: true, image: `media:${heroImage.id}`, en: { title: 'Smoke payment', description: 'Payment description', instruction: 'Payment instruction', alt: 'Smoke payment' }, sw: { title: 'Malipo ya majaribio', description: 'Maelezo ya malipo', instruction: 'Maelekezo', alt: 'Malipo' } },
-      { id: 'home-smoke-stove', type: 'stove', visible: true, image: `media:${galleryImage.id}`, price: 'TZS 88,000', en: { title: 'Smoke stove', description: 'Stove description', alt: 'Smoke stove' }, sw: { title: 'Jiko la majaribio', description: 'Maelezo ya jiko', alt: 'Jiko' } },
-      { id: 'home-smoke-partner', type: 'partner', visible: true, image: `media:${galleryImage.id}`, en: { title: 'Smoke partner', description: 'Partner description', link: 'https://example.com/partner', alt: 'Smoke partner logo' }, sw: { title: 'Mshirika wa majaribio', description: 'Maelezo ya mshirika', alt: 'Nembo ya mshirika' } },
+      { id: 'home-smoke-product', type: 'product', visible: true, anchor: 'products', image: `media:${productImage.id}`, price: 'TZS 99,000', link: 'https://wa.me/255784017225', en: { kicker: 'For kitchens', title: 'Smoke product', description: 'Product description', buttonLabel: 'Order product', alt: 'Smoke product', format: { size: 'large', weight: 'bold', color: 'forest', align: 'center', heading: 'h3', font: 'sans' } }, sw: { title: 'Bidhaa ya majaribio', description: 'Maelezo ya bidhaa', buttonLabel: 'Agiza bidhaa', alt: 'Bidhaa ya majaribio' } },
+      { id: 'home-smoke-payment', type: 'payment', visible: true, anchor: 'payment', image: `media:${heroImage.id}`, en: { title: 'Smoke payment', description: 'Payment description', instruction: 'Payment instruction', alt: 'Smoke payment' }, sw: { title: 'Malipo ya majaribio', description: 'Maelezo ya malipo', instruction: 'Maelekezo', alt: 'Malipo' } },
+      { id: 'home-smoke-stove-5', type: 'stove', visible: true, anchor: 'cookstoves', image: `media:${galleryImage.id}`, price: 'TZS 88,000', en: { title: 'Smoke stove five', description: 'Stove description five', alt: 'Smoke stove five' }, sw: { title: 'Jiko la majaribio tano', description: 'Maelezo ya jiko tano', alt: 'Jiko tano' } },
+      { id: 'home-smoke-stove-6', type: 'stove', visible: true, anchor: 'cookstoves', image: `media:${productImage.id}`, price: 'TZS 99,000', en: { title: 'Smoke stove six', description: 'Stove description six', alt: 'Smoke stove six' }, sw: { title: 'Jiko la majaribio sita', description: 'Maelezo ya jiko sita', alt: 'Jiko sita' } },
+      { id: 'home-smoke-partner', type: 'partner', visible: true, anchor: 'partners', image: `media:${galleryImage.id}`, en: { title: 'Smoke partner', description: 'Partner description', link: 'https://example.com/partner', alt: 'Smoke partner logo' }, sw: { title: 'Mshirika wa majaribio', description: 'Maelezo ya mshirika', alt: 'Nembo ya mshirika' } },
       { id: 'home-smoke-testimonial', type: 'testimonial', visible: true, image: `media:${heroImage.id}`, en: { title: 'Smoke customer', quote: 'A durable customer quote.', attribution: 'Kunduchi', alt: 'Smoke customer' }, sw: { title: 'Mteja wa majaribio', quote: 'Ushuhuda wa mteja.', attribution: 'Kunduchi', alt: 'Mteja wa majaribio' } },
       { id: 'home-smoke-cta', type: 'cta', visible: true, en: { heading: 'Smoke CTA', description: 'Call to action description', buttonLabel: 'Contact EcoPower', buttonLink: 'https://wa.me/255784017225' }, sw: { heading: 'CTA ya majaribio', description: 'Maelezo ya CTA', buttonLabel: 'Wasiliana na EcoPower', buttonLink: 'https://wa.me/255784017225' } }
     ];
@@ -298,7 +309,10 @@ async function main() {
     result = await request('/api/pages/home/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(result.response.status, 200, 'new Home block types should publish');
     result = await request('/api/public/home');
-    assert.deepEqual(result.body.published.en.content.blocks.map((block) => block.type), ['product', 'payment', 'stove', 'partner', 'testimonial', 'cta'], 'new Home block types should remain after publishing');
+    assert.deepEqual(result.body.published.en.content.blocks.map((block) => block.type), ['product', 'payment', 'stove', 'stove', 'partner', 'testimonial', 'cta'], 'new Home block types should remain after publishing');
+    const publishedStoves = result.body.published.en.content.blocks.filter((block) => block.type === 'stove');
+    assert.deepEqual(publishedStoves.map((block) => block.id), ['home-smoke-stove-5', 'home-smoke-stove-6'], 'fifth and sixth stoves should remain distinct after publish and refresh');
+    assert.ok(publishedStoves.every((block) => block.anchor === 'cookstoves'), 'fifth and sixth stoves should retain the stove collection anchor');
     const invalidFormatBlock = { ...richHomeBlocks[0], id: 'home-invalid-format', en: { ...richHomeBlocks[0].en, format: { size: 'unsafe-css-value' } } };
     result = await request('/api/pages/home/draft', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: { blocks: [invalidFormatBlock] } }) });
     assert.equal(result.response.status, 400, 'unsupported formatting values should be rejected');

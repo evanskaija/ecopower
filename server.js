@@ -22,7 +22,7 @@ const PUBLISHED_UPLOAD_DIR = path.join(UPLOAD_DIR, 'published');
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
 const PAGES = [
   ['home', 'Home'], ['products', 'Products and Prices'], ['about', 'About Us'], ['team', 'Our Team'],
-  ['impact', 'Our Results'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
+  ['impact', 'Our Impact'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
 ];
 
 for (const directory of [DATA_DIR, PRIVATE_UPLOAD_DIR, PUBLISHED_UPLOAD_DIR]) fs.mkdirSync(directory, { recursive: true });
@@ -513,6 +513,36 @@ app.get('/api/public/:slug', (req, res) => {
 app.get('/api/media', requireAuth, (_req, res) => {
   const assets = db.prepare('SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC').all().map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` }));
   res.json({ media: assets });
+});
+app.patch('/api/media/:id', requireAuth, requireRole('owner', 'admin', 'editor'), (req, res) => {
+  try {
+    const metadata = normalizeMediaMetadata(req.body || {});
+    const result = db.prepare(`UPDATE media_assets SET alt_text_en = ?, alt_text_sw = ?, caption_en = ?, caption_sw = ?, description_en = ?, description_sw = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.params.id);
+    if (!result.changes) return res.status(404).json({ error: 'Media asset not found.' });
+    const asset = db.prepare('SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url FROM media_assets WHERE id = ?').get(req.params.id);
+    audit(req, 'media.metadata.update', req.params.id);
+    res.json({ media: { ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` } });
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+app.delete('/api/media/:id', requireAuth, requireRole('owner', 'admin'), async (req, res) => {
+  const asset = db.prepare('SELECT * FROM media_assets WHERE id = ?').get(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Media asset not found.' });
+  const references = db.prepare(`SELECT p.slug FROM pages p JOIN page_content c ON c.page_id = p.id WHERE c.content_json LIKE ? OR c.blocks_json LIKE ? GROUP BY p.slug`).all(`%media:${req.params.id}%`, `%media:${req.params.id}%`);
+  if (references.length) return res.status(409).json({ error: `This image is still used on ${references.map((row) => row.slug).join(', ')}. Replace it there before removing it.` });
+  try {
+    if (process.env.NODE_ENV === 'production' && process.env.BLOB_READ_WRITE_TOKEN) {
+      const { del } = require('@vercel/blob');
+      await del(asset.storage_path, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      if (asset.public_url) await del(asset.public_url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    } else {
+      const filePath = path.resolve(ROOT, asset.storage_path);
+      const uploadRoot = path.resolve(UPLOAD_DIR);
+      if (filePath === uploadRoot || filePath.startsWith(`${uploadRoot}${path.sep}`)) fs.rmSync(filePath, { force: true });
+    }
+    db.prepare('DELETE FROM media_assets WHERE id = ?').run(req.params.id);
+    audit(req, 'media.delete', req.params.id);
+    res.json({ ok: true });
+  } catch (error) { res.status(500).json({ error: error.message || 'The image could not be removed.' }); }
 });
 
 app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upload.single('file'), async (req, res) => {

@@ -30,7 +30,7 @@ const PRIVATE_BLOB_STORE_ID = process.env[privateStoreIdName] || '';
 const PUBLIC_BLOB_STORE_ID = process.env[publicStoreIdName] || '';
 const PAGES = [
   ['home', 'Home'], ['products', 'Products and Prices'], ['about', 'About Us'], ['team', 'Our Team'],
-  ['impact', 'Our Results'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
+  ['impact', 'Our Impact'], ['partners', 'Partner With Us'], ['faq', 'Questions'], ['contact', 'Contact Us']
 ];
 
 if (!/^postgres(ql)?:\/\//i.test(DATABASE_URL)) throw new Error('DATABASE_URL must be a PostgreSQL connection string for the production entrypoint.');
@@ -254,6 +254,65 @@ function assertBlobStore(url, expectedStoreId, label) {
   try { hostname = new URL(url).hostname.toLowerCase(); } catch { throw new Error(`${label} Blob returned an invalid URL.`); }
   if (!hostname.startsWith(`${String(expectedStoreId).toLowerCase()}.`)) throw new Error(`${label} Blob store ID does not match the configured ${VERCEL_ENV} store.`);
 }
+async function deletePrivateBlob(storagePath) {
+  if (!storagePath || !PRIVATE_BLOB_TOKEN) return;
+  try {
+    const { del } = require('@vercel/blob');
+    await del(blobPathname(storagePath), { token: PRIVATE_BLOB_TOKEN });
+  } catch (error) {
+    console.error(JSON.stringify({ action: 'media.cleanup_failed', storagePath: blobPathname(storagePath), error: error.message }));
+  }
+}
+async function storePrivateBlob({ pathname, buffer, contentType }) {
+  if (!PRIVATE_BLOB_TOKEN) throw new Error(`${privateTokenName} is required before uploading an image.`);
+  const { get, put } = require('@vercel/blob');
+  let storagePath = '';
+  try {
+    const blob = await put(pathname, buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType });
+    storagePath = blob.pathname || blob.url;
+    if (!storagePath) throw new Error('Private Vercel Blob did not return a storage path.');
+    assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
+    const verification = await get(blobPathname(storagePath), { access: 'private', token: PRIVATE_BLOB_TOKEN, useCache: false });
+    if (!verification || verification.statusCode !== 200) throw new Error('The uploaded image could not be verified in the private Vercel Blob store.');
+    return storagePath;
+  } catch (error) {
+    await deletePrivateBlob(storagePath);
+    throw error;
+  }
+}
+async function readPrivateBlob(storagePath) {
+  if (!PRIVATE_BLOB_TOKEN) throw new Error(`${privateTokenName} is required before reading an uploaded image.`);
+  const { get } = require('@vercel/blob');
+  const blob = await get(blobPathname(storagePath), { access: 'private', token: PRIVATE_BLOB_TOKEN, useCache: false });
+  if (!blob || blob.statusCode !== 200) throw new Error('The private Vercel Blob image could not be read.');
+  return { blob, buffer: Buffer.from(await new Response(blob.stream).arrayBuffer()) };
+}
+function parseClientUploadPath(value) {
+  const pathname = String(value || '').replace(/^\/+/, '');
+  const match = pathname.match(/^private\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(jpg|png|webp|avif|gif)$/i);
+  if (!match) throw new Error('The secure upload path is invalid.');
+  return { pathname, id: match[1], extension: `.${match[2].toLowerCase()}` };
+}
+function mediaResponse(asset) {
+  return {
+    id: asset.id,
+    original_name: asset.original_name,
+    alt_text_en: asset.alt_text_en || '',
+    alt_text_sw: asset.alt_text_sw || '',
+    caption_en: asset.caption_en || '',
+    caption_sw: asset.caption_sw || '',
+    description_en: asset.description_en || '',
+    description_sw: asset.description_sw || '',
+    mime_type: asset.mime_type,
+    file_size: asset.file_size,
+    width: asset.width,
+    height: asset.height,
+    status: asset.status,
+    public_url: asset.public_url || null,
+    src: `media:${asset.id}`,
+    preview_url: `/api/media/${asset.id}/file`
+  };
+}
 
 async function pageId(executor, slug) { return (await query(executor, 'SELECT id FROM pages WHERE slug = $1', [slug])).rows[0]?.id; }
 async function currentContent(executor, slug, status, language) {
@@ -326,7 +385,8 @@ function sameOrigin(req, res, next) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   const origin = req.get('origin');
   const deploymentOrigin = process.env.VERCEL_URL ? `https://${String(process.env.VERCEL_URL).replace(/^https?:\/\//i, '')}` : '';
-  if (!origin || origin === PUBLIC_ORIGIN || origin === deploymentOrigin) return next();
+  const requestOrigin = req.get('host') ? `${req.protocol}://${req.get('host')}` : '';
+  if (!origin || origin === PUBLIC_ORIGIN || origin === deploymentOrigin || origin === requestOrigin) return next();
   return res.status(403).json({ error: 'Cross-origin request rejected.' });
 }
 function audit(req, action, target, metadata = {}) { console.log(JSON.stringify({ at: nowIso(), actor: req.user?.email || 'public', action, target, metadata })); }
@@ -481,7 +541,89 @@ app.get('/api/public/:slug', async (req, res, next) => {
 });
 
 app.get('/api/media', requireAuth, async (_req, res, next) => { try { const assets = (await query(pool, 'SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC')).rows.map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` })); res.json({ media: assets }); } catch (error) { next(error); } });
+app.patch('/api/media/:id', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  try {
+    let metadata;
+    try { metadata = normalizeMediaMetadata(req.body || {}); } catch (error) { return res.status(400).json({ error: error.message }); }
+    const result = await query(pool, `UPDATE media_assets SET alt_text_en = $1, alt_text_sw = $2, caption_en = $3, caption_sw = $4, description_en = $5, description_sw = $6, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7 RETURNING id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url`, [metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Media asset not found.' });
+    audit(req, 'media.metadata.update', req.params.id);
+    res.json({ media: mediaResponse(result.rows[0]) });
+  } catch (error) { next(error); }
+});
+app.delete('/api/media/:id', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => {
+  try {
+    const asset = (await query(pool, 'SELECT * FROM media_assets WHERE id = $1', [req.params.id])).rows[0];
+    if (!asset) return res.status(404).json({ error: 'Media asset not found.' });
+    const references = await query(pool, `SELECT p.slug FROM pages p JOIN page_content c ON c.page_id = p.id
+      WHERE c.content_json::text LIKE $1 OR c.blocks_json::text LIKE $1 GROUP BY p.slug`, [`%media:${req.params.id}%`]);
+    if (references.rowCount) return res.status(409).json({ error: `This image is still used on ${references.rows.map((row) => row.slug).join(', ')}. Replace it there before removing it.` });
+    if (asset.public_url && PUBLIC_BLOB_TOKEN) {
+      try { const { del } = require('@vercel/blob'); await del(asset.public_url, { token: PUBLIC_BLOB_TOKEN }); } catch (error) { console.error(JSON.stringify({ action: 'media.public_cleanup_failed', mediaId: req.params.id, error: error.message })); }
+    }
+    await deletePrivateBlob(asset.storage_path);
+    await query(pool, 'DELETE FROM media_assets WHERE id = $1', [req.params.id]);
+    audit(req, 'media.delete', req.params.id);
+    res.json({ ok: true });
+  } catch (error) { next(error); }
+});
+app.post('/api/media/client-upload', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  try {
+    if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: `${privateTokenName} is required before uploading an image.` });
+    if (req.body?.type !== 'blob.generate-client-token') return res.status(400).json({ error: 'Invalid secure upload request.' });
+    const payload = req.body?.payload || {};
+    const upload = parseClientUploadPath(payload.pathname);
+    if (payload.multipart) return res.status(400).json({ error: 'Multipart client uploads are not supported for images.' });
+    const { handleUpload } = require('@vercel/blob');
+    const result = await handleUpload({
+      token: PRIVATE_BLOB_TOKEN,
+      request: req,
+      body: req.body,
+      onBeforeGenerateToken: async (pathname, _clientPayload, multipart) => {
+        const requested = parseClientUploadPath(pathname);
+        if (requested.id !== upload.id || requested.extension !== upload.extension || multipart) throw new Error('The secure upload request does not match the selected image.');
+        return {
+          access: 'private',
+          addRandomSuffix: false,
+          allowOverwrite: false,
+          allowedContentTypes: [...ALLOWED_IMAGE_TYPES],
+          maximumSizeInBytes: MAX_IMAGE_SIZE
+        };
+      }
+    });
+    res.json({ ...result, id: upload.id, pathname: upload.pathname });
+  } catch (error) { next(error); }
+});
+app.post('/api/media/client-upload/complete', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  let storagePath = '';
+  let keepBlob = false;
+  const clientError = (message) => { const error = new Error(message); error.statusCode = 400; throw error; };
+  try {
+    const upload = parseClientUploadPath(req.body?.pathname);
+    storagePath = upload.pathname;
+    const existing = (await query(pool, 'SELECT * FROM media_assets WHERE id = $1', [upload.id])).rows[0];
+    if (existing) { keepBlob = true; return res.status(200).json({ media: mediaResponse(existing) }); }
+    const { blob, buffer } = await readPrivateBlob(storagePath);
+    let metadata;
+    try { metadata = normalizeMediaMetadata(req.body?.metadata || {}); } catch (error) { clientError(error.message); }
+    const declaredMime = String(req.body?.mime_type || blob.blob?.contentType || 'application/octet-stream');
+    let inspected;
+    try { inspected = inspectImageBuffer(buffer, declaredMime); } catch (error) { clientError(error.message); }
+    if (inspected.extension !== upload.extension) clientError('The uploaded image extension does not match its file contents.');
+    const originalName = String(req.body?.original_name || `${upload.id}${inspected.extension}`).trim().replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, 180) || `${upload.id}${inspected.extension}`;
+    await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [upload.id, originalName, storagePath, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
+    keepBlob = true;
+    audit(req, 'media.upload', upload.id, { filename: originalName, transport: 'client-upload' });
+    res.status(201).json({ media: mediaResponse({ id: upload.id, original_name: originalName, ...metadata, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', public_url: null }) });
+  } catch (error) {
+    if (!keepBlob) await deletePrivateBlob(storagePath);
+    next(error);
+  }
+});
 app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upload.single('file'), async (req, res, next) => {
+  let storagePath = '';
   try {
     if (!req.file) return res.status(400).json({ error: 'Upload a supported image file.' });
     if (!PRIVATE_BLOB_TOKEN) return res.status(500).json({ error: `${privateTokenName} is required before uploading an image.` });
@@ -490,16 +632,18 @@ app.post('/api/media', requireAuth, requireRole('owner', 'admin', 'editor'), upl
     let inspected;
     try { inspected = inspectImageBuffer(req.file.buffer, req.file.mimetype); } catch (error) { return res.status(400).json({ error: error.message }); }
     const id = crypto.randomUUID();
-    const { put } = require('@vercel/blob');
-    const blob = await put(`private/${id}${inspected.extension}`, req.file.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: inspected.mimeType });
-    assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
+    storagePath = await storePrivateBlob({ pathname: `private/${id}${inspected.extension}`, buffer: req.file.buffer, contentType: inspected.mimeType });
     await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, req.file.originalname, blob.pathname || blob.url, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, req.file.originalname, storagePath, inspected.mimeType, inspected.fileSize, inspected.width, inspected.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
     audit(req, 'media.upload', id, { filename: req.file.originalname });
     res.status(201).json({ media: { id, original_name: req.file.originalname, ...metadata, mime_type: inspected.mimeType, file_size: inspected.fileSize, width: inspected.width, height: inspected.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    await deletePrivateBlob(storagePath);
+    next(error);
+  }
 });
 app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
+  let storagePath = '';
   try {
     const sourceUrl = String(req.body?.url || '').trim();
     if (!sourceUrl) return res.status(400).json({ error: 'An HTTPS image URL is required.' });
@@ -509,15 +653,16 @@ app.post('/api/media/import', requireAuth, requireRole('owner', 'admin', 'editor
     let imported;
     try { imported = await fetchRemoteImage(sourceUrl); } catch (error) { return res.status(400).json({ error: error.message }); }
     const id = crypto.randomUUID();
-    const { put } = require('@vercel/blob');
-    const blob = await put(`private/${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`, imported.buffer, { access: 'private', addRandomSuffix: true, token: PRIVATE_BLOB_TOKEN, contentType: imported.mimeType });
-    assertBlobStore(blob.url, PRIVATE_BLOB_STORE_ID, 'Private');
+    storagePath = await storePrivateBlob({ pathname: `private/${id}${IMAGE_EXTENSIONS.get(imported.mimeType)}`, buffer: imported.buffer, contentType: imported.mimeType });
     const originalName = `remote-${imported.sourceHash}${IMAGE_EXTENSIONS.get(imported.mimeType)}`;
     await query(pool, `INSERT INTO media_assets (id, original_name, storage_path, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, originalName, blob.pathname || blob.url, imported.mimeType, imported.fileSize, imported.width, imported.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`, [id, originalName, storagePath, imported.mimeType, imported.fileSize, imported.width, imported.height, metadata.alt_text_en, metadata.alt_text_sw, metadata.caption_en, metadata.caption_sw, metadata.description_en, metadata.description_sw, req.user.id]);
     audit(req, 'media.import', id, { source: imported.sourceUrl, mimeType: imported.mimeType, fileSize: imported.fileSize });
     res.status(201).json({ media: { id, original_name: originalName, ...metadata, mime_type: imported.mimeType, file_size: imported.fileSize, width: imported.width, height: imported.height, status: 'private', src: `media:${id}`, preview_url: `/api/media/${id}/file` } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    await deletePrivateBlob(storagePath);
+    next(error);
+  }
 });
 app.get('/api/media/:id/file', requireAuth, async (req, res, next) => {
   try {

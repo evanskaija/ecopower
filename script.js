@@ -509,6 +509,121 @@ const cmsBlockImage = (value, copy, className = '', position = 'center') => {
   const safePosition = ['center', 'top', 'bottom', 'left', 'right'].includes(position) ? position : 'center';
   return value ? `<img class="${className}" data-cms-image-ref="${cmsEscape(value)}" src="${cmsEscape(cmsAssetUrl(value))}" alt="${cmsEscape(copy?.alt || copy?.title || '')}" loading="lazy" style="object-position:${safePosition}" />` : '';
 };
+const cmsHomeCollectionAnchors = { product: 'products', payment: 'payment', stove: 'cookstoves', partner: 'partners' };
+const cmsHomeCollectionBlocks = (content, type) => (Array.isArray(content?.blocks) ? content.blocks : []).filter((block) => block?.type === type && block.anchor === cmsHomeCollectionAnchors[type] && block.visible !== false);
+const cmsHomeCollectionBlockIds = (blocks = []) => new Set(blocks.filter((block) => cmsHomeCollectionAnchors[block?.type] === block?.anchor).map((block) => block.id));
+const cmsHomeCollectionItems = (section, blocks) => [
+  ...(Array.isArray(section?.items) ? section.items : []),
+  ...blocks.map((block) => ({ ...block, _cmsDynamic: true }))
+];
+const cmsHomeAppendHtml = (parent, markup) => {
+  if (!parent || !markup) return null;
+  const holder = document.createElement('div');
+  holder.innerHTML = markup;
+  const element = holder.firstElementChild;
+  if (element) parent.appendChild(element);
+  return element;
+};
+const cmsHomeRemoveCollectionItems = (selector, type) => {
+  document.querySelectorAll(`${selector} [data-cms-collection-item="${type}"]`).forEach((element) => element.remove());
+};
+const cmsHomeStoveMarkup = (block, language) => {
+  const copy = cmsBlockCopy(block, language);
+  const title = copy.title || copy.name || copy.heading || 'EcoPower stove';
+  const price = block.price || copy.price || 'Quotation';
+  const quotePrice = /quotation|quote|bei kwa makubaliano|omba bei/i.test(price);
+  const button = copy.buttonLabel || copy.button || (quotePrice ? (language === 'sw' ? 'Omba bei' : 'Ask for a quote') : (language === 'sw' ? 'Agiza WhatsApp' : 'Order on WhatsApp'));
+  const href = cmsSafeHref(block.link || copy.buttonLink || 'https://wa.me/255784017225');
+  return `<article class="home-stove-card" data-cms-collection-item="stove" data-cms-block-id="${cmsEscape(block.id)}">${cmsBlockImage(block.image, { ...copy, title }, '', block.position)}<p class="card-kicker">${cmsEscape(copy.kicker || (language === 'sw' ? 'Imetengenezwa na EcoPower' : 'Made by EcoPower'))}</p><h3>${cmsEscape(title)}</h3><p>${cmsEscape(copy.description || '')}</p><strong class="home-stove-price">${cmsEscape(price)}</strong><a class="button button-green" href="${cmsEscape(href)}">${cmsEscape(button)}</a></article>`;
+};
+const cmsHomeProductMarkup = (block, language) => {
+  const copy = cmsBlockCopy(block, language);
+  const title = copy.title || copy.name || copy.heading || 'Makange product';
+  const price = block.price || copy.price || '';
+  const button = copy.buttonLabel || copy.button || (language === 'sw' ? 'Agiza WhatsApp' : 'Order on WhatsApp');
+  const href = cmsSafeHref(block.link || copy.buttonLink || 'https://wa.me/255784017225');
+  const weight = copy.name?.match(/\d+\s?kg/i)?.[0] || copy.kicker || '';
+  return `<article class="card product-card" data-cms-collection-item="product" data-cms-block-id="${cmsEscape(block.id)}" tabindex="0">${cmsBlockImage(block.image, { ...copy, title }, 'product-card-image', block.position)}<div class="card-body">${copy.kicker ? `<p class="card-kicker">${cmsEscape(copy.kicker)}</p>` : ''}<h3>${cmsEscape(title)}</h3><p>${cmsEscape(copy.description || '')}</p><div class="price-row"><strong>${cmsEscape(price)}</strong><span>${cmsEscape(weight)}</span></div><a class="button button-green button-block" href="${cmsEscape(href)}">${cmsEscape(button)}</a></div></article>`;
+};
+const cmsHomePaymentMarkup = (block, language) => {
+  const copy = cmsBlockCopy(block, language);
+  const title = copy.title || copy.heading || 'Payment information';
+  const description = copy.description || copy.instruction || '';
+  const note = copy.description && copy.instruction ? copy.instruction : '';
+  return `<div class="payment-row cms-payment-collection-item" data-cms-collection-item="payment" data-cms-block-id="${cmsEscape(block.id)}"><span>${cmsEscape(title)}</span><strong>${cmsEscape(description)}</strong><small>${cmsEscape(note)}</small></div>`;
+};
+const cmsHomePaymentFeatureMarkup = (blocks, language) => {
+  const images = blocks.filter((block) => block.image).map((block) => {
+    const copy = cmsBlockCopy(block, language);
+    const title = copy.title || copy.heading || 'Payment information';
+    return cmsBlockImage(block.image, { ...copy, title }, 'cms-payment-feature-image', block.position);
+  }).join('');
+  return images ? `<div class="cms-payment-feature" data-cms-payment-feature="true"><div class="cms-payment-feature-grid">${images}</div></div>` : '';
+};
+const cmsHomePartnerMarkup = (block, language) => {
+  const copy = cmsBlockCopy(block, language);
+  const title = copy.title || copy.name || copy.heading || 'EcoPower partner';
+  return `<div class="home-partner-logo cms-partner-collection-item" data-cms-collection-item="partner" data-cms-block-id="${cmsEscape(block.id)}" title="${cmsEscape(title)}">${cmsBlockImage(block.image, { ...copy, title }, '', block.position)}</div>`;
+};
+const cmsHomeRenderStoves = (items, language) => {
+  const grid = document.querySelector('.home-stove-grid');
+  if (!grid) return;
+  cmsHomeRemoveCollectionItems('.home-stove-grid', 'stove');
+  const baseCards = [...grid.querySelectorAll('.home-stove-card:not([data-cms-collection-item])')];
+  items.forEach((item, index) => {
+    const copy = cmsBlockCopy(item, language);
+    if (item._cmsDynamic) { cmsHomeAppendHtml(grid, cmsHomeStoveMarkup(item, language)); return; }
+    const card = baseCards[index];
+    if (!card || !copy) return;
+    cmsText('.card-kicker', copy.kicker, false, card); cmsText('h3', copy.name, false, card); cmsText('p:not(.card-kicker)', copy.description, false, card); cmsText('.home-stove-price', copy.price, false, card);
+    cmsApplyTextFormat('h3', copy.format, card); cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card);
+    const button = card.querySelector('.button'); if (button) { button.textContent = copy.button; button.href = item.link || button.href; }
+    cmsImage('img', item.image, copy.alt, item.imagePosition, card);
+  });
+};
+const cmsHomeRenderProducts = (items, language) => {
+  const grid = document.querySelector('#products .product-grid');
+  if (!grid) return;
+  cmsHomeRemoveCollectionItems('#products .product-grid', 'product');
+  const baseCards = [...grid.querySelectorAll('.product-card:not([data-cms-collection-item])')];
+  const noteCard = grid.querySelector('.note-card');
+  items.forEach((item, index) => {
+    const copy = cmsBlockCopy(item, language);
+    if (item._cmsDynamic) {
+      const card = cmsHomeAppendHtml(grid, cmsHomeProductMarkup(item, language));
+      if (card && noteCard) grid.insertBefore(card, noteCard);
+      return;
+    }
+    const card = baseCards[index];
+    if (!card || !copy) return;
+    cmsText('h3', copy.name, false, card); cmsText('p:not(.card-kicker)', copy.description, false, card); cmsApplyTextFormat('h3', copy.format, card); cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card); cmsText('.price-row strong', item.price, false, card); cmsText('.price-row span', copy.name?.match(/\d+\s?kg/i)?.[0] || '', false, card);
+    const button = card.querySelector('.button'); if (button) { button.textContent = copy.button; button.href = item.link || button.href; }
+    cmsImage('img', item.image, copy.alt, item.imagePosition, card);
+  });
+};
+const cmsHomeRenderPayments = (blocks, language) => {
+  const list = document.querySelector('#how-it-works .payment-list');
+  if (!list) return;
+  cmsHomeRemoveCollectionItems('#how-it-works .payment-list', 'payment');
+  blocks.forEach((block) => cmsHomeAppendHtml(list, cmsHomePaymentMarkup(block, language)));
+  const panel = document.querySelector('#how-it-works .payment-panel-how');
+  if (!panel) return;
+  panel.classList.remove('has-cms-payment-image');
+  panel.querySelectorAll('[data-cms-payment-feature]').forEach((feature) => feature.remove());
+  const featureMarkup = cmsHomePaymentFeatureMarkup(blocks, language);
+  if (!featureMarkup) return;
+  const feature = cmsHomeAppendHtml(panel, featureMarkup);
+  const qrStack = panel.querySelector('.payment-qr-stack');
+  if (feature && qrStack) panel.insertBefore(feature, qrStack);
+  panel.classList.add('has-cms-payment-image');
+  feature?.querySelectorAll('[data-cms-image-ref]').forEach((image) => cmsSetImage(image, image.dataset.cmsImageRef));
+};
+const cmsHomeRenderPartners = (blocks, language) => {
+  const grid = document.querySelector('.home-partner-logos');
+  if (!grid) return;
+  cmsHomeRemoveCollectionItems('.home-partner-logos', 'partner');
+  blocks.forEach((block) => cmsHomeAppendHtml(grid, cmsHomePartnerMarkup(block, language)));
+};
 const cmsBlockMarkup = (block, language) => {
   const copy = cmsBlockCopy(block, language);
   if (block.type === 'text') return `<section class="cms-dynamic-block cms-dynamic-text section section-white"><div class="page-width cms-dynamic-copy">${copy.heading ? `<p class="eyebrow">${cmsEscape(copy.subheading || '')}</p>${cmsFormattedText(copy.heading, copy.format, 'h2')}` : ''}${cmsFormattedText(copy.description, copy.format, 'p')}${cmsBlockButton(copy)}</div></section>`;
@@ -536,6 +651,36 @@ const cmsHomeSectionSelectors = {
   impact: '.home-impact-summary', partners: '.home-partner-section', footer: 'footer'
 };
 const cmsMarkHomeSections = () => {
+  if (document.body.dataset.page === 'products') {
+    const selectors = { hero: '.page-hero', makange: '#makange', lighting: '#lighting', stoves: '#stoves', bundle: '#bundle', cta: '.products-bottom-cta', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
+  if (document.body.dataset.page === 'about') {
+    const selectors = { story: '.about-story-section', process: '.about-process-section', founder: '.about-founder-card', partners: '.home-funders-card', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
+  if (document.body.dataset.page === 'team') {
+    const selectors = { management: 'main > section.section-white .people-grid', board: 'main > section.section-cream .people-grid', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
+  if (document.body.dataset.page === 'impact') {
+    const selectors = { comparison: '.impact-comparison-section', benefits: '.impact-benefits', customers: '.impact-customers-section', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
+  if (document.body.dataset.page === 'partners') {
+    const selectors = { wakala: '.partners-wakala-section', business: '.partners-business-section', funders: '.partners-funders-section', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
+  if (document.body.dataset.page === 'faq') {
+    const selectors = { questions: '.faq-reference-section', cta: '.faq-reference-cta', footer: 'footer' };
+    Object.entries(selectors).forEach(([key, selector]) => { const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector); if (element && !element.dataset.cmsSection) element.dataset.cmsSection = key; });
+    return;
+  }
   if (document.body.dataset.page !== 'home') return;
   Object.entries(cmsHomeSectionSelectors).forEach(([key, selector]) => {
     const element = document.querySelector(selector)?.closest('section, footer') || document.querySelector(selector);
@@ -569,9 +714,10 @@ const renderCmsBlocks = (blocks = [], language = document.documentElement.lang |
   const main = document.querySelector('main');
   if (!main) return;
   main.querySelectorAll('[data-cms-dynamic-container]').forEach((container) => container.remove());
+  const homeCollectionBlockIds = document.body.dataset.page === 'home' ? cmsHomeCollectionBlockIds(blocks) : new Set();
   const lastAfter = new Map();
   const lastBefore = new Map();
-  (Array.isArray(blocks) ? blocks : []).filter((block) => block && block.visible !== false).forEach((block) => {
+  (Array.isArray(blocks) ? blocks : []).filter((block) => block && block.visible !== false && !homeCollectionBlockIds.has(block.id)).forEach((block) => {
     const container = document.createElement('div');
     container.dataset.cmsDynamicContainer = 'true';
     container.dataset.cmsSection = block.id;
@@ -604,7 +750,7 @@ const loadCmsContentFromApi = async (language, preview = cmsPreviewMode, variant
     const payload = await response.json();
     const collection = useDraftEndpoint ? payload.draft : payload.published;
     const requested = collection?.[language];
-    const fallback = page === 'home' ? (collection?.en || collection?.sw) : null;
+    const fallback = page === 'home' || page === 'about' || page === 'team' || page === 'impact' || page === 'partners' || page === 'faq' ? (collection?.en || collection?.sw) : null;
     const record = requested || fallback;
     cmsPublishedVersion = record?.updated_at || (record?.version ? String(record.version) : '');
     return record?.content || null;
@@ -665,6 +811,7 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsApplyTextFormat(`.trust-item:nth-child(${index + 1}) span`, copy.format);
   });
   const products = content.products;
+  const productBlocks = cmsHomeCollectionBlocks(content, 'product');
   const productsCopy = products?.[lang] || products?.en;
   if (productsCopy) {
     cmsText('#products .section-heading .eyebrow', productsCopy.eyebrow);
@@ -672,21 +819,7 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsText('#products .section-heading > p', productsCopy.description);
     cmsApplyTextFormat('#products .section-heading h2', productsCopy.format);
     cmsApplyTextFormat('#products .section-heading > p', productsCopy.format);
-    products?.items?.forEach((product, index) => {
-      const card = document.querySelectorAll('#products .product-card')[index];
-      const copy = product[lang] || product.en;
-      if (!card || !copy) return;
-      cmsText('h3', copy.name, false, card);
-      cmsText('p:not(.card-kicker)', copy.description, false, card);
-      cmsApplyTextFormat('h3', copy.format, card);
-      cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card);
-      cmsText('.price-row strong', product.price, false, card);
-      const weight = copy.name.match(/\d+\s?kg/i)?.[0] || '';
-      cmsText('.price-row span', weight, false, card);
-      const button = card.querySelector('.button');
-      if (button) { button.textContent = copy.button; button.href = product.link || button.href; }
-      cmsImage('img', product.image, copy.alt, product.imagePosition, card);
-    });
+    cmsHomeRenderProducts(cmsHomeCollectionItems(products, productBlocks), lang);
     products?.items?.forEach((product, index) => {
       const panelPrice = document.querySelectorAll('.price-panel-grid strong')[index];
       const panelWeight = document.querySelectorAll('.price-panel-grid small')[index];
@@ -707,6 +840,7 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     }
   }
   const ordering = content.ordering;
+  const paymentBlocks = cmsHomeCollectionBlocks(content, 'payment');
   const orderingCopy = ordering?.[lang] || ordering?.en;
   if (orderingCopy) {
     cmsText('#how-it-works .section-heading h2', cmsHeadlineWithEmphasis(orderingCopy.heading, lang), true);
@@ -723,6 +857,7 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     const rows = document.querySelectorAll('#how-it-works .payment-row');
     [[orderingCopy.mpesaLabel, orderingCopy.mpesaNumber, orderingCopy.mpesaNote], [orderingCopy.crdbLabel, orderingCopy.crdbNumber, orderingCopy.crdbNote]].forEach((row, index) => { if (!rows[index]) return; cmsText('span', row[0], false, rows[index]); cmsText('strong', row[1], false, rows[index]); cmsText('small', row[2], false, rows[index]); });
   }
+  cmsHomeRenderPayments(paymentBlocks, lang);
   const factory = content.factory;
   const factoryCopy = factory?.[lang] || factory?.en;
   if (factoryCopy) {
@@ -750,21 +885,14 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     if (!homeImages) cmsImage('.category-grid .category-card img', kitchen.image, undefined, kitchen.imagePosition);
   }
   const stoves = content.cookstoves;
+  const stoveBlocks = cmsHomeCollectionBlocks(content, 'stove');
   const stoveCopy = stoves?.[lang] || stoves?.en;
   if (stoveCopy) {
     cmsText('.stove-showcase .section-heading h2', stoveCopy.title);
     cmsText('.stove-showcase .section-heading > p', stoveCopy.description);
     cmsApplyTextFormat('.stove-showcase .section-heading h2', stoveCopy.format);
     cmsApplyTextFormat('.stove-showcase .section-heading > p', stoveCopy.format);
-    stoves.items?.forEach((item, index) => {
-      const card = document.querySelectorAll('.home-stove-card')[index];
-      const copy = item[lang] || item.en;
-      if (!card || !copy) return;
-      cmsText('.card-kicker', copy.kicker, false, card); cmsText('h3', copy.name, false, card); cmsText('p:not(.card-kicker)', copy.description, false, card); cmsText('.home-stove-price', copy.price, false, card);
-      cmsApplyTextFormat('h3', copy.format, card); cmsApplyTextFormat('p:not(.card-kicker)', copy.format, card);
-      const button = card.querySelector('.button'); if (button) button.textContent = copy.button;
-      cmsImage('img', item.image, copy.alt, item.imagePosition, card);
-    });
+    cmsHomeRenderStoves(cmsHomeCollectionItems(stoves, stoveBlocks), lang);
   }
   const impact = content.impact;
   const impactCopy = impact?.[lang] || impact?.en;
@@ -776,8 +904,10 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
     cmsApplyTextFormat('.home-impact-summary > .page-width > p', impactCopy.format);
   }
   const partners = content.partners;
+  const partnerBlocks = cmsHomeCollectionBlocks(content, 'partner');
   const partnerCopy = partners?.[lang] || partners?.en;
   if (partnerCopy) { cmsText('.home-wakala-card h2', partnerCopy.title); cmsText('.home-wakala-card p', partnerCopy.description); cmsApplyTextFormat('.home-wakala-card h2', partnerCopy.format); cmsApplyTextFormat('.home-wakala-card p', partnerCopy.format); const button = document.querySelector('.home-wakala-card .button'); if (button) { button.textContent = partnerCopy.button; button.href = partners.link || button.href; } }
+  cmsHomeRenderPartners(partnerBlocks, lang);
   const footer = content.footer;
   const footerCopy = footer?.[lang] || footer?.en;
   if (footerCopy) {
@@ -790,6 +920,471 @@ const applyCmsHomeContent = (content, language = document.documentElement.lang |
   cmsApplySectionOrder(content);
   cmsApplySectionVisibility(content);
   renderCmsBlocks(content.blocks, lang);
+  setupMobileReadMore();
+  syncMobileReadToggleLabels();
+};
+const cmsProductsSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsProductsCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.title, selected.name, selected.description, selected.bestFor, selected.price, selected.kicker].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsProductsStoveMarkup = (item, language) => {
+  const copy = cmsProductsCopy(item, language);
+  const href = cmsSafeHref(copy.link || item.link || 'https://wa.me/255784017225');
+  return `<article class="stove-card"><img src="${cmsEscape(cmsAssetUrl(item.image || ''))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" /><p class="card-kicker">${cmsEscape(copy.kicker || '')}</p><h3>${cmsEscape(copy.name || '')}</h3><p>${cmsEscape(copy.description || '')}</p><div class="price-row"><strong>${cmsEscape(copy.price || '')}</strong></div><a class="button button-green button-block" data-product-order="${cmsEscape(`one ${copy.name || 'cookstove'} - ${copy.price || 'quotation'}`)}" href="${cmsEscape(href)}">${cmsEscape(copy.button || (language === 'sw' ? 'Agiza WhatsApp' : 'Order on WhatsApp'))}</a></article>`;
+};
+const cmsProductsBundleMarkup = (item, language) => {
+  const copy = cmsProductsCopy(item, language);
+  const image = item.image ? `<img class="bundle-card-image" src="${cmsEscape(cmsAssetUrl(item.image))}" alt="${cmsEscape(copy.alt || copy.title || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />` : '';
+  const href = cmsSafeHref(copy.link || item.link || 'https://wa.me/255784017225');
+  return `<article class="bundle-panel bundle-card">${image}<div><p class="eyebrow">${cmsEscape(copy.kicker || '')}</p><h3>${cmsEscape(copy.title || '')}</h3><p>${cmsEscape(copy.description || '')}</p>${copy.included ? `<small class="bundle-included">${cmsEscape(copy.included)}</small>` : ''}</div><div><strong class="price-row"><span>Total</span><strong>${cmsEscape(copy.price || '')}</strong></strong><a class="button button-primary" data-product-order="${cmsEscape(`starter bundle: ${copy.title || ''} - ${copy.price || ''}`)}" href="${cmsEscape(href)}">${cmsEscape(copy.button || (language === 'sw' ? 'Agiza kifurushi' : 'Order bundle'))}</a></div></article>`;
+};
+const applyCmsProductsContent = (content, language = 'en') => {
+  const catalog = content?.productsCatalog;
+  if (!catalog || document.body.dataset.page !== 'products') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  const hero = catalog.hero;
+  const heroCopy = cmsProductsCopy(hero, lang);
+  cmsText('.page-hero .eyebrow', heroCopy.eyebrow);
+  cmsText('.page-hero h1', heroCopy.emphasis ? cmsHeadline(heroCopy) : heroCopy.title, true);
+  cmsText('.page-hero h1 + p', heroCopy.description);
+  cmsApplyTextFormat('.page-hero h1', heroCopy.format);
+  cmsApplyTextFormat('.page-hero h1 + p', heroCopy.format);
+  cmsImage('.page-hero-art', hero?.image, heroCopy.alt, hero?.position);
+
+  const makange = catalog.makange;
+  const makangeCopy = cmsProductsCopy(makange, lang);
+  cmsText('#makange .catalogue-copy > .eyebrow', makangeCopy.eyebrow);
+  cmsText('#makange .catalogue-copy h2', makangeCopy.title);
+  cmsText('#makange .catalogue-copy > p:not(.eyebrow)', makangeCopy.description);
+  cmsApplyTextFormat('#makange .catalogue-copy h2', makangeCopy.format);
+  cmsApplyTextFormat('#makange .catalogue-copy > p:not(.eyebrow)', makangeCopy.format);
+  cmsImage('#makange .catalogue-image', makange?.image, makangeCopy.alt, makange?.position);
+  const tableBody = document.querySelector('#makange .data-table tbody');
+  if (tableBody) tableBody.innerHTML = cmsProductsSortedItems(makange?.items || []).map(({ item }) => {
+    const copy = cmsProductsCopy(item, lang);
+    const thumb = item.image ? `<img class="catalogue-product-thumb" src="${cmsEscape(cmsAssetUrl(item.image))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />` : '';
+    const name = copy.name || copy.packageType || '';
+    const packageType = copy.packageType && copy.packageType !== name ? `<small>${cmsEscape(copy.packageType)}</small>` : '';
+    const bestFor = `${cmsEscape(copy.bestFor || '')}${copy.description ? `<small class="catalogue-row-description">${cmsEscape(copy.description)}</small>` : ''}`;
+    return `<tr><td>${thumb}<strong>${cmsEscape(name)}</strong>${packageType}</td><td>${bestFor}</td><td><strong>${cmsEscape(copy.price || '')}</strong></td></tr>`;
+  }).join('');
+  const bullets = document.querySelectorAll('#makange .catalogue-copy > ul li');
+  (makangeCopy.bullets || []).forEach((value, index) => { if (bullets[index]) bullets[index].textContent = value; });
+  const orderButton = document.querySelector('#makange .catalogue-copy > .button');
+  if (orderButton) { orderButton.textContent = makangeCopy.button || orderButton.textContent; orderButton.href = cmsSafeHref(makangeCopy.buttonLink || orderButton.href); }
+
+  const lighting = catalog.lighting;
+  const lightingCopy = cmsProductsCopy(lighting, lang);
+  cmsText('#lighting .section-heading .eyebrow', lightingCopy.eyebrow);
+  cmsText('#lighting .section-heading h2', lightingCopy.title);
+  cmsText('#lighting .section-heading > p', lightingCopy.description);
+  cmsApplyTextFormat('#lighting .section-heading h2', lightingCopy.format);
+  cmsApplyTextFormat('#lighting .section-heading > p', lightingCopy.format);
+  (lighting?.items || []).forEach((item, index) => {
+    const card = document.querySelectorAll('#lighting .lighting-card')[index];
+    if (!card) return;
+    const copy = cmsProductsCopy(item, lang);
+    cmsImage('img', item.image, copy.alt, item.position, card);
+    cmsText('strong', copy.title, false, card);
+    cmsText('p', copy.description, false, card);
+  });
+
+  const stoves = catalog.stoves;
+  const stoveCopy = cmsProductsCopy(stoves, lang);
+  cmsText('#stoves .section-heading .eyebrow', stoveCopy.eyebrow);
+  cmsText('#stoves .section-heading h2', stoveCopy.title);
+  cmsText('#stoves .section-heading > p', stoveCopy.description);
+  cmsApplyTextFormat('#stoves .section-heading h2', stoveCopy.format);
+  cmsApplyTextFormat('#stoves .section-heading > p', stoveCopy.format);
+  const stoveGrid = document.querySelector('#stoves .stove-grid');
+  if (stoveGrid) stoveGrid.innerHTML = cmsProductsSortedItems(stoves?.items || []).map(({ item }) => cmsProductsStoveMarkup(item, lang)).join('');
+
+  const bundle = catalog.bundle;
+  const bundleHost = document.querySelector('#bundle .page-width');
+  if (bundleHost) bundleHost.innerHTML = `<div class="bundle-grid">${cmsProductsSortedItems(bundle?.items || []).map(({ item }) => cmsProductsBundleMarkup(item, lang)).join('')}</div>`;
+
+  const cta = catalog.cta;
+  const ctaCopy = cmsProductsCopy(cta, lang);
+  cmsText('.products-bottom-cta h2', ctaCopy.title);
+  cmsText('.products-bottom-cta p', ctaCopy.description);
+  cmsApplyTextFormat('.products-bottom-cta h2', ctaCopy.format);
+  cmsApplyTextFormat('.products-bottom-cta p', ctaCopy.format);
+  const ctaButton = document.querySelector('.products-bottom-cta .button');
+  if (ctaButton) { ctaButton.textContent = ctaCopy.button || ctaButton.textContent; ctaButton.href = cmsSafeHref(ctaCopy.link || ctaButton.href); }
+};
+const cmsAboutSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsAboutCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.year, selected.title, selected.name, selected.description, selected.role].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsAboutProcessTitle = (title, index) => `${index + 1}. ${String(title || '').replace(/^\d+\.\s*/, '')}`;
+const applyCmsAboutContent = (content, language = 'en') => {
+  const catalog = content?.aboutCatalog;
+  if (!catalog || document.body.dataset.page !== 'about') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  const story = catalog.story;
+  const storyCopy = cmsAboutCopy(story, lang);
+  cmsText('.about-story-section h2', storyCopy.title);
+  cmsText('.about-story-subtitle', storyCopy.subtitle);
+  cmsApplyTextFormat('.about-story-section h2', storyCopy.format);
+  cmsApplyTextFormat('.about-story-subtitle', storyCopy.format);
+  const timeline = document.querySelector('.about-story-section .timeline');
+  if (timeline) {
+    timeline.innerHTML = cmsAboutSortedItems(story?.items || []).map(({ item }) => {
+      const copy = cmsAboutCopy(item, lang);
+      return `<article class="timeline-card"><strong>${cmsEscape(copy.year || '')}</strong><h3>${cmsEscape(copy.title || '')}</h3><p>${cmsEscape(copy.description || '')}</p></article>`;
+    }).join('');
+    timeline.querySelectorAll('.timeline-card').forEach((card, index) => {
+      const item = cmsAboutSortedItems(story?.items || [])[index]?.item;
+      const copy = cmsAboutCopy(item, lang);
+      cmsApplyTextFormat('h3', copy.format, card);
+      cmsApplyTextFormat('p', copy.format, card);
+    });
+  }
+
+  const process = catalog.process;
+  const processCopy = cmsAboutCopy(process, lang);
+  cmsText('.about-process-section h2', processCopy.title);
+  cmsApplyTextFormat('.about-process-section h2', processCopy.format);
+  const journey = document.querySelector('.about-process-section .journey-grid');
+  if (journey) {
+    journey.innerHTML = cmsAboutSortedItems(process?.items || []).map(({ item }, index) => {
+      const copy = cmsAboutCopy(item, lang);
+      const image = item.image ? `<img src="${cmsEscape(cmsAssetUrl(item.image))}" alt="${cmsEscape(copy.alt || copy.title || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />` : '';
+      return `<article class="journey-card">${image}<strong>${cmsEscape(cmsAboutProcessTitle(copy.title, index))}</strong><p>${cmsEscape(copy.description || '')}</p></article>`;
+    }).join('');
+    journey.querySelectorAll('.journey-card').forEach((card, index) => {
+      const item = cmsAboutSortedItems(process?.items || [])[index]?.item;
+      const copy = cmsAboutCopy(item, lang);
+      cmsApplyTextFormat('strong', copy.format, card);
+      cmsApplyTextFormat('p', copy.format, card);
+    });
+  }
+
+  const founder = catalog.founder;
+  const founderCopy = cmsAboutCopy(founder, lang);
+  cmsImage('.about-founder-card img', founder?.image, founderCopy.alt, founder?.position);
+  cmsText('.about-founder-card h2', founderCopy.name);
+  cmsText('.about-founder-card span', founderCopy.role);
+  cmsText('.about-founder-card p', founderCopy.description);
+  cmsApplyTextFormat('.about-founder-card h2', founderCopy.format);
+  cmsApplyTextFormat('.about-founder-card p', founderCopy.format);
+  const founderLink = document.querySelector('.about-founder-card .text-link');
+  if (founderLink) { founderLink.textContent = founderCopy.link || founderLink.textContent; founderLink.href = cmsSafeHref(founderCopy.linkHref || founderLink.href); }
+
+  const partners = catalog.partners;
+  const partnerCopy = cmsAboutCopy(partners, lang);
+  cmsText('.home-funders-card h3', partnerCopy.title);
+  const partnerDescription = document.querySelector('.about-partners-intro');
+  if (partnerDescription) cmsText('.about-partners-intro', partnerCopy.description);
+  const partnerGrid = document.querySelector('.about-bottom-section .home-partner-logos');
+  if (partnerGrid) {
+    partnerGrid.innerHTML = cmsAboutSortedItems(partners?.items || []).map(({ item }) => {
+      const copy = cmsAboutCopy(item, lang);
+      const content = `<img src="${cmsEscape(cmsAssetUrl(item.image || ''))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />`;
+      const label = copy.description ? `${copy.name || ''}: ${copy.description}` : (copy.name || 'EcoPower partner');
+      return copy.link ? `<a class="home-partner-logo" href="${cmsEscape(cmsSafeHref(copy.link))}" target="_blank" rel="noopener" title="${cmsEscape(label)}" aria-label="${cmsEscape(label)}">${content}</a>` : `<div class="home-partner-logo" title="${cmsEscape(label)}" aria-label="${cmsEscape(label)}">${content}</div>`;
+    }).join('');
+  }
+};
+const cmsTeamSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsTeamCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.name, selected.role, selected.description, selected.alt].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsTeamHeadingMarkup = (copy, language) => {
+  const value = String(copy?.title || '');
+  const knownSuffixes = language === 'sw' ? ['kusudi.', 'ukuaji.'] : ['purpose.', 'growth.'];
+  const suffix = String(copy?.emphasis || knownSuffixes.find((candidate) => value.toLowerCase().endsWith(candidate)) || '').trim();
+  if (!suffix || !value.toLowerCase().endsWith(suffix.toLowerCase())) return cmsEscape(value);
+  return `${cmsEscape(value.slice(0, -suffix.length))}<em>${cmsEscape(value.slice(-suffix.length))}</em>`;
+};
+const cmsTeamMemberMarkup = (item, language) => {
+  const copy = cmsTeamCopy(item, language);
+  const image = item.image ? `<img class="person-photo" src="${cmsEscape(cmsAssetUrl(item.image))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />` : '';
+  return `<article class="person-card">${image}<h3>${cmsEscape(copy.name || '')}</h3><span>${cmsEscape(copy.role || '')}</span>${copy.description ? `<p>${cmsEscape(copy.description)}</p>` : ''}</article>`;
+};
+const applyCmsTeamContent = (content, language = 'en') => {
+  const catalog = content?.teamCatalog;
+  if (!catalog || document.body.dataset.page !== 'team') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  const renderSection = (section, grid, headingSelector, descriptionSelector) => {
+    const copy = cmsTeamCopy(section, lang);
+    cmsText(headingSelector, cmsTeamHeadingMarkup(copy, lang), true);
+    cmsText(descriptionSelector, copy.description);
+    cmsApplyTextFormat(headingSelector, copy.format);
+    cmsApplyTextFormat(descriptionSelector, copy.format);
+    if (!grid) return;
+    grid.innerHTML = cmsTeamSortedItems(section?.items || []).map(({ item }) => cmsTeamMemberMarkup(item, lang)).join('');
+    cmsTeamSortedItems(section?.items || []).forEach(({ item }, index) => {
+      const card = grid.querySelectorAll('.person-card')[index];
+      const memberCopy = cmsTeamCopy(item, lang);
+      if (!card) return;
+      cmsApplyTextFormat('h3', memberCopy.format, card);
+      cmsApplyTextFormat('span', memberCopy.format, card);
+      cmsApplyTextFormat('p', memberCopy.format, card);
+    });
+  };
+  renderSection(catalog.management, document.querySelector('main > section.section-white .people-grid'), 'main > section.section-white .section-heading h2', 'main > section.section-white .section-heading > p');
+  renderSection(catalog.board, document.querySelector('main > section.section-cream .people-grid'), 'main > section.section-cream .section-heading h2', 'main > section.section-cream .section-heading > p');
+};
+const cmsImpactSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsImpactCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.name, selected.title, selected.description, selected.quoteSw, selected.quoteEn, selected.cost].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsImpactCustomerMarkup = (item, language) => {
+  const copy = cmsImpactCopy(item, language);
+  const attribution = [copy.occupation, copy.location].filter((value) => String(value || '').trim()).join(', ');
+  const image = item.image ? `<img src="${cmsEscape(cmsAssetUrl(item.image))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" />` : '';
+  return `<article class="customer-card">${image}<div><blockquote>${cmsEscape(copy.quoteSw || '')}</blockquote><p>${cmsEscape(copy.quoteEn || '')}</p><cite><strong>${cmsEscape(copy.name || '')}</strong>${attribution ? `, ${cmsEscape(attribution)}` : ''}</cite></div></article>`;
+};
+const applyCmsImpactContent = (content, language = 'en') => {
+  const catalog = content?.impactCatalog;
+  if (!catalog || document.body.dataset.page !== 'impact') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  const comparison = catalog.comparison;
+  const comparisonCopy = cmsImpactCopy(comparison, lang);
+  cmsText('.comparison-card h2', comparisonCopy.title);
+  cmsText('.comparison-card > p', comparisonCopy.description);
+  cmsText('.comparison-note', comparisonCopy.note);
+  cmsApplyTextFormat('.comparison-card h2', comparisonCopy.format);
+  cmsApplyTextFormat('.comparison-card > p', comparisonCopy.format);
+  cmsApplyTextFormat('.comparison-note', comparisonCopy.format);
+  const tableBody = document.querySelector('.comparison-card .data-table tbody');
+  if (tableBody) {
+    tableBody.innerHTML = cmsImpactSortedItems(comparison?.items || []).map(({ item }) => {
+      const copy = cmsImpactCopy(item, lang);
+      return `<tr><td><strong>${cmsEscape(copy.name || '')}</strong><br /><small>${cmsEscape(copy.unit || '')}</small></td><td>${cmsEscape(copy.amount || '')}</td><td><strong>${cmsEscape(copy.cost || '')}</strong>${copy.explanation ? `<br /><small>${cmsEscape(copy.explanation)}</small>` : ''}</td></tr>`;
+    }).join('');
+    cmsImpactSortedItems(comparison?.items || []).forEach(({ item }, index) => {
+      const copy = cmsImpactCopy(item, lang);
+      const row = tableBody.querySelectorAll('tr')[index];
+      if (!row) return;
+      cmsApplyTextFormat('strong', copy.format, row);
+      cmsApplyTextFormat('small', copy.format, row);
+    });
+  }
+
+  const benefits = catalog.benefits;
+  const benefitGrid = document.querySelector('.impact-benefits');
+  if (benefitGrid) {
+    benefitGrid.innerHTML = cmsImpactSortedItems(benefits?.items || []).map(({ item }) => {
+      const copy = cmsImpactCopy(item, lang);
+      const statistic = copy.statistic ? `<small class="impact-benefit-stat">${cmsEscape(copy.statistic)}</small>` : '';
+      const source = copy.source ? `<small class="impact-benefit-source">${cmsEscape(copy.source)}</small>` : '';
+      return `<article class="impact-benefit"><h3>${cmsEscape(copy.title || '')}</h3><p>${cmsEscape(copy.description || '')}</p>${statistic}${source}</article>`;
+    }).join('');
+    cmsImpactSortedItems(benefits?.items || []).forEach(({ item }, index) => {
+      const copy = cmsImpactCopy(item, lang);
+      const card = benefitGrid.querySelectorAll('.impact-benefit')[index];
+      if (!card) return;
+      cmsApplyTextFormat('h3', copy.format, card);
+      cmsApplyTextFormat('p', copy.format, card);
+    });
+  }
+
+  const customers = catalog.customers;
+  const customerCopy = cmsImpactCopy(customers, lang);
+  cmsText('.impact-customers-section h2', customerCopy.title);
+  cmsApplyTextFormat('.impact-customers-section h2', customerCopy.format);
+  const customerGrid = document.querySelector('.impact-customers-section .customer-grid');
+  if (customerGrid) {
+    customerGrid.innerHTML = cmsImpactSortedItems(customers?.items || []).map(({ item }) => cmsImpactCustomerMarkup(item, lang)).join('');
+    cmsImpactSortedItems(customers?.items || []).forEach(({ item }, index) => {
+      const copy = cmsImpactCopy(item, lang);
+      const card = customerGrid.querySelectorAll('.customer-card')[index];
+      if (!card) return;
+      cmsApplyTextFormat('blockquote', copy.format, card);
+      cmsApplyTextFormat('p', copy.format, card);
+      cmsApplyTextFormat('cite', copy.format, card);
+    });
+  }
+};
+const cmsPartnerSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsPartnerCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.name, selected.title, selected.description, selected.phone, selected.button].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsPartnerPhoneHref = (phone = '') => {
+  const value = String(phone || '').trim();
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 9) return '#';
+  const normalized = value.startsWith('+') ? `+${digits}` : digits.startsWith('0') && digits.length === 10 ? `+255${digits.slice(1)}` : digits;
+  return `tel:${normalized}`;
+};
+const applyCmsPartnersContent = (content, language = 'en') => {
+  const catalog = content?.partnerCatalog;
+  if (!catalog || document.body.dataset.page !== 'partners') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+
+  const wakala = catalog.wakala;
+  const wakalaCopy = cmsPartnerCopy(wakala, lang);
+  cmsText('.partners-wakala-card > .eyebrow', wakalaCopy.eyebrow);
+  cmsText('.partners-wakala-card h2', wakalaCopy.title);
+  cmsText('.partners-wakala-card > p:not(.eyebrow):not(.partners-wakala-label)', wakalaCopy.description);
+  cmsText('.partners-wakala-label', wakalaCopy.label);
+  cmsText('.partners-wakala-card > p:last-of-type', wakalaCopy.followup);
+  cmsImage('.partners-wakala-photo', wakala?.image, wakalaCopy.alt, wakala?.position);
+  const wakalaButton = document.querySelector('.partners-wakala-card .button');
+  if (wakalaButton) { wakalaButton.textContent = wakalaCopy.button || wakalaButton.textContent; wakalaButton.href = cmsSafeHref(wakalaCopy.buttonLink || wakalaButton.href); }
+  cmsApplyTextFormat('.partners-wakala-card h2', wakalaCopy.format);
+  cmsApplyTextFormat('.partners-wakala-card > p:not(.eyebrow):not(.partners-wakala-label)', wakalaCopy.format);
+  const wakalaGrid = document.querySelector('.partners-wakala-card .wakala-grid');
+  if (wakalaGrid) {
+    wakalaGrid.innerHTML = cmsPartnerSortedItems(wakala?.items || []).map(({ item }) => {
+      const copy = cmsPartnerCopy(item, lang);
+      const description = copy.description ? `<small>${cmsEscape(copy.description)}</small>` : '';
+      return `<a class="wakala-card" href="${cmsEscape(cmsPartnerPhoneHref(copy.phone))}"><strong>${cmsEscape(copy.name || '')}</strong>${description}<span>${cmsEscape(copy.phone || '')}</span></a>`;
+    }).join('');
+    cmsPartnerSortedItems(wakala?.items || []).forEach(({ item }, index) => {
+      const copy = cmsPartnerCopy(item, lang);
+      const card = wakalaGrid.querySelectorAll('.wakala-card')[index];
+      if (!card) return;
+      cmsApplyTextFormat('strong', copy.format, card);
+      cmsApplyTextFormat('small', copy.format, card);
+      cmsApplyTextFormat('span', copy.format, card);
+    });
+  }
+
+  const business = catalog.business;
+  const businessCopy = cmsPartnerCopy(business, lang);
+  cmsText('.partners-business-section .eyebrow', businessCopy.eyebrow);
+  cmsText('.partners-business-section h2', businessCopy.title);
+  cmsText('.partners-business-section > .page-width > div:first-child > p', businessCopy.description);
+  const businessButton = document.querySelector('.partners-business-section .button');
+  if (businessButton) { businessButton.textContent = businessCopy.button || businessButton.textContent; businessButton.href = cmsSafeHref(businessCopy.buttonLink || businessButton.href); }
+  cmsApplyTextFormat('.partners-business-section h2', businessCopy.format);
+  cmsApplyTextFormat('.partners-business-section > .page-width > div:first-child > p', businessCopy.format);
+  const serviceGrid = document.querySelector('.partners-business-section .partner-services');
+  if (serviceGrid) {
+    serviceGrid.innerHTML = cmsPartnerSortedItems(business?.items || []).map(({ item }) => {
+      const copy = cmsPartnerCopy(item, lang);
+      return `<span class="service-pill">${cmsEscape(copy.name || '')}${copy.description ? `<small>${cmsEscape(copy.description)}</small>` : ''}</span>`;
+    }).join('');
+    cmsPartnerSortedItems(business?.items || []).forEach(({ item }, index) => {
+      const copy = cmsPartnerCopy(item, lang);
+      const pill = serviceGrid.querySelectorAll('.service-pill')[index];
+      if (!pill) return;
+      cmsApplyTextFormat('.service-pill', copy.format, pill);
+      cmsApplyTextFormat('small', copy.format, pill);
+    });
+  }
+
+  const funders = catalog.funders;
+  const fundersCopy = cmsPartnerCopy(funders, lang);
+  cmsText('.partners-funders-section h2', fundersCopy.title);
+  cmsText('.partners-funders-intro', fundersCopy.description);
+  cmsApplyTextFormat('.partners-funders-section h2', fundersCopy.format);
+  cmsApplyTextFormat('.partners-funders-intro', fundersCopy.format);
+  const funderGrid = document.querySelector('.partners-funders-grid');
+  if (funderGrid) {
+    funderGrid.innerHTML = cmsPartnerSortedItems(funders?.items || []).map(({ item }) => {
+      const copy = cmsPartnerCopy(item, lang);
+      const inner = `<img src="${cmsEscape(cmsAssetUrl(item.image || ''))}" alt="${cmsEscape(copy.alt || copy.name || '')}" loading="lazy" style="object-position:${cmsEscape(item.position || 'center')}" /><span>${cmsEscape(copy.name || '')}</span>${copy.description ? `<small>${cmsEscape(copy.description)}</small>` : ''}`;
+      return copy.link ? `<a class="partners-funder-card" href="${cmsEscape(cmsSafeHref(copy.link))}" target="_blank" rel="noopener">${inner}</a>` : `<article class="partners-funder-card">${inner}</article>`;
+    }).join('');
+    cmsPartnerSortedItems(funders?.items || []).forEach(({ item }, index) => {
+      const copy = cmsPartnerCopy(item, lang);
+      const card = funderGrid.querySelectorAll('.partners-funder-card')[index];
+      if (!card) return;
+      cmsApplyTextFormat('span', copy.format, card);
+      cmsApplyTextFormat('small', copy.format, card);
+    });
+  }
+};
+const cmsFaqSortedItems = (items = []) => items.filter((item) => item && item.visible !== false).map((item, index) => ({ item, index })).sort((left, right) => {
+  const leftOrder = Number(left.item.displayOrder);
+  const rightOrder = Number(right.item.displayOrder);
+  const safeLeft = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : left.index + 1;
+  const safeRight = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : right.index + 1;
+  return safeLeft - safeRight || left.index - right.index;
+});
+const cmsFaqCopy = (record, language) => {
+  const selected = record?.[language];
+  if (selected && [selected.question, selected.answer, selected.answerLinkText].some((value) => String(value || '').trim())) return selected;
+  return record?.en || record?.sw || selected || {};
+};
+const cmsFaqAnswerMarkup = (copy) => {
+  let answer = cmsEscape(copy?.answer || '').replace(/\r?\n/g, '<br />');
+  answer = answer.replace(/\b(352491280|104084772)\b/g, '<strong>$1</strong>');
+  if (String(copy?.answerLinkUrl || '').trim()) {
+    const href = cmsSafeHref(copy.answerLinkUrl);
+    const label = cmsEscape(copy.answerLinkText || copy.answerLinkUrl);
+    answer += ` <a href="${cmsEscape(href)}">${label}</a>`;
+  }
+  return answer;
+};
+const cmsBindFaqToggles = (scope = document) => scope.querySelectorAll('[data-faq-toggle]').forEach((button) => {
+  if (button.dataset.cmsFaqBound === 'true') return;
+  button.dataset.cmsFaqBound = 'true';
+  button.addEventListener('click', () => {
+    const item = button.closest('.faq-item');
+    const open = item?.classList.toggle('is-open');
+    button.setAttribute('aria-expanded', String(Boolean(open)));
+  });
+});
+const applyCmsFaqContent = (content, language = 'en') => {
+  const catalog = content?.faqCatalog;
+  if (!catalog || document.body.dataset.page !== 'faq') return;
+  const lang = language === 'sw' ? 'sw' : 'en';
+  ['ordering', 'paying', 'using', 'business'].forEach((key, groupIndex) => {
+    const group = document.querySelectorAll('.faq-group')[groupIndex];
+    const section = catalog[key];
+    if (!group || !section) return;
+    const sectionCopy = cmsFaqCopy(section, lang);
+    const items = cmsFaqSortedItems(section.items || []);
+    group.innerHTML = `<h3>${cmsEscape(sectionCopy.title || '')}</h3>${items.map(({ item }) => {
+      const copy = cmsFaqCopy(item, lang);
+      const open = item.open === true;
+      return `<div class="faq-item${open ? ' is-open' : ''}"><button class="faq-question" type="button" data-faq-toggle aria-expanded="${String(open)}"><span>${cmsEscape(copy.question || '')}</span><span aria-hidden="true">&#9654;</span></button><div class="faq-answer">${cmsFaqAnswerMarkup(copy)}</div></div>`;
+    }).join('')}`;
+    cmsApplyTextFormat('h3', sectionCopy.format, group);
+    items.forEach(({ item }, index) => {
+      const card = group.querySelectorAll('.faq-item')[index];
+      if (!card) return;
+      const copy = cmsFaqCopy(item, lang);
+      cmsApplyTextFormat('.faq-question span:first-child', copy.format, card);
+      cmsApplyTextFormat('.faq-answer', copy.format, card);
+    });
+    cmsBindFaqToggles(group);
+  });
 };
 const applyCmsPageContent = (content) => {
   if (!content || document.body.dataset.page === 'home') return;
@@ -807,9 +1402,16 @@ const applyCmsPageContent = (content) => {
       if (element.href !== undefined && target.tagName === 'A') target.href = element.href;
     }
   });
+  const language = document.documentElement.lang || 'en';
+  applyCmsProductsContent(content, language);
+  applyCmsAboutContent(content, language);
+  applyCmsTeamContent(content, language);
+  applyCmsImpactContent(content, language);
+  applyCmsPartnersContent(content, language);
+  applyCmsFaqContent(content, language);
   cmsApplySectionOrder(content);
   cmsApplySectionVisibility(content);
-  renderCmsBlocks(content.blocks, document.documentElement.lang || 'en');
+  if (document.body.dataset.page !== 'products') renderCmsBlocks(content.blocks, language);
 };
 window.__ecopowerApplyPreview = (content, language = 'en', version = '') => {
   cmsPreviewOverride = { content, language, version };
@@ -972,11 +1574,7 @@ document.querySelectorAll('.product-card').forEach((card) => {
   });
 });
 
-document.querySelectorAll('[data-faq-toggle]').forEach((button) => button.addEventListener('click', () => {
-  const item = button.closest('.faq-item');
-  const open = item?.classList.toggle('is-open');
-  button.setAttribute('aria-expanded', String(Boolean(open)));
-}));
+cmsBindFaqToggles();
 
 const faqSearch = document.querySelector('.faq-search');
 faqSearch?.addEventListener('input', () => {
@@ -1051,9 +1649,34 @@ scrollRevealElements.forEach((element, index) => {
   element.style.setProperty('--reveal-delay', `${Math.min(index % 4, 3) * 70}ms`);
 });
 
+const textRevealSelectors = [
+  'main .eyebrow',
+  'main h1',
+  'main h2',
+  'main h3',
+  'main h4',
+  'main p:not(.eyebrow)',
+  'main li',
+  'main .button',
+  'main .text-link',
+  'footer h3',
+  'footer p',
+  'footer a',
+  'footer span:not(.sr-only)'
+].join(', ');
+
+const textRevealElements = [...document.querySelectorAll(textRevealSelectors)];
+textRevealElements.forEach((element, index) => {
+  element.classList.add('text-reveal');
+  const direction = index % 3 === 0 ? 'text-reveal--left' : index % 3 === 1 ? 'text-reveal--right' : 'text-reveal--up';
+  element.classList.add(direction);
+  element.style.setProperty('--text-reveal-delay', `${Math.min(index % 5, 4) * 45}ms`);
+});
+
+const revealElements = [...new Set([...scrollRevealElements, ...textRevealElements])];
 const revealImmediately = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 if (revealImmediately || !('IntersectionObserver' in window)) {
-  scrollRevealElements.forEach((element) => element.classList.add('is-visible'));
+  revealElements.forEach((element) => element.classList.add('is-visible'));
 } else {
   const revealObserver = new IntersectionObserver((entries, observer) => {
     entries.forEach((entry) => {
@@ -1062,7 +1685,7 @@ if (revealImmediately || !('IntersectionObserver' in window)) {
       observer.unobserve(entry.target);
     });
   }, { threshold: 0.12, rootMargin: '0px 0px -36px' });
-  scrollRevealElements.forEach((element) => revealObserver.observe(element));
+  revealElements.forEach((element) => revealObserver.observe(element));
 }
 
 const socialProfiles = [

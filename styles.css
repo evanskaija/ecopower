@@ -1637,3 +1637,204 @@ h1, h2, h3 { letter-spacing: -.045em; }
     font-size: 14px;
   }
 }
+
+/* EcoPower appearance system. Keep the content and image pipeline shared between themes. */
+:root {
+  color-scheme: light;
+  --surface: var(--white);
+  --surface-raised: #ffffff;
+  --page-bg: var(--cream);
+  --text-strong: var(--charcoal);
+  --text-soft: var(--muted);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cream: #121d18;
+  --white: #1c2a23;
+  --charcoal: #edf5ef;
+  --muted: #a9bbb0;
+  --line: #365348;
+  --soft-green: #1d3b2e;
+  --forest: #0d4d37;
+  --deep: #071d15;
+  --fresh: #54d38b;
+  --lime: #c9f266;
+  --gold: #e5c45e;
+  --surface: #1c2a23;
+  --surface-raised: #24362c;
+  --page-bg: #121d18;
+  --text-strong: #edf5ef;
+  --text-soft: #a9bbb0;
+  --shadow: 0 16px 34px rgba(0, 0, 0, .24);
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+  background: var(--page-bg);
+  color: var(--text-strong);
+}
+
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--forest);
+  font-size: 19px;
+  line-height: 1;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease;
+}
+
+.theme-toggle:hover { border-color: var(--fresh); color: var(--fresh); transform: translateY(-1px); }
+.theme-toggle:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
+.theme-toggle-icon { display: block; width: 1em; height: 1em; }
+:root[data-theme="light"] .theme-toggle-moon,
+:root[data-theme="dark"] .theme-toggle-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle { background: #17352a; color: var(--lime); }
+
+:root[data-theme="dark"] .nav-wrap {
+  background: rgba(18, 29, 24, .94);
+  border-bottom-color: rgba(84, 211, 139, .18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+}
+
+:root[data-theme="dark"] .nav-link { color: #d2e6d8; }
+:root[data-theme="dark"] .brand-text strong { color: #edf5ef; }
+:root[data-theme="dark"] .brand-text small { color: #a9bbb0; }
+:root[data-theme="dark"] .menu-toggle { background: var(--soft-green); }
+:root[data-theme="dark"] .menu-toggle span:not(.sr-only) { background: #bfeecf; }
+:root[data-theme="dark"] .language-switcher,
+:root[data-theme="dark"] .language-menu,
+:root[data-theme="dark"] .language-flag { background: var(--surface-raised); border-color: var(--line); }
+:root[data-theme="dark"] .language-menu::before { background: var(--surface-raised); border-color: var(--line); }
+:root[data-theme="dark"] .language-menu button:hover,
+:root[data-theme="dark"] .language-menu button.selected { background: #214635; border-color: rgba(84, 211, 139, .34); }
+:root[data-theme="dark"] .language-menu button > span:nth-child(2),
+:root[data-theme="dark"] .language-code { color: #e4f3e9; }
+
+:root[data-theme="dark"] .section-white,
+:root[data-theme="dark"] .section-cream,
+:root[data-theme="dark"] .subnav,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .step-card,
+:root[data-theme="dark"] .payment-panel,
+:root[data-theme="dark"] .kitchen-quote,
+:root[data-theme="dark"] .home-stove-card,
+:root[data-theme="dark"] .home-funders-card,
+:root[data-theme="dark"] .home-partner-logo,
+:root[data-theme="dark"] .about-founder-card,
+:root[data-theme="dark"] .mission-card,
+:root[data-theme="dark"] .timeline-card,
+:root[data-theme="dark"] .impact-number,
+:root[data-theme="dark"] .impact-gallery figure,
+:root[data-theme="dark"] .customer-card,
+:root[data-theme="dark"] .comparison-card,
+:root[data-theme="dark"] .partner-funder-card,
+:root[data-theme="dark"] .partners-business-panel,
+:root[data-theme="dark"] .service-pill,
+:root[data-theme="dark"] .partner-form,
+:root[data-theme="dark"] .contact-form,
+:root[data-theme="dark"] .contact-card,
+:root[data-theme="dark"] .contact-payment-panel,
+:root[data-theme="dark"] .faq-reference-list .faq-item {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .factory-story-section,
+:root[data-theme="dark"] .about-bottom-section,
+:root[data-theme="dark"] .contact-map-card { background: #18271f; }
+:root[data-theme="dark"] .home-wakala-card,
+:root[data-theme="dark"] .partners-wakala-card,
+:root[data-theme="dark"] .contact-wakala-card,
+:root[data-theme="dark"] .bundle-panel { background: #3a321b; }
+:root[data-theme="dark"] .partners-wakala-card .wakala-card,
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a { background: rgba(28, 42, 35, .84); }
+:root[data-theme="dark"] .home-partner-logo,
+:root[data-theme="dark"] .category-card-contain img,
+:root[data-theme="dark"] .home-stove-card img,
+:root[data-theme="dark"] .catalogue-product-thumb,
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea,
+:root[data-theme="dark"] .faq-search { background: #17251e; }
+
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3,
+:root[data-theme="dark"] h4,
+:root[data-theme="dark"] .section-heading h2,
+:root[data-theme="dark"] .story-copy h2,
+:root[data-theme="dark"] .about-layout h2,
+:root[data-theme="dark"] .impact-number span,
+:root[data-theme="dark"] .contact-card strong,
+:root[data-theme="dark"] .faq-question,
+:root[data-theme="dark"] .faq-reference-list .faq-question,
+:root[data-theme="dark"] .faq-reference-list .faq-answer strong,
+:root[data-theme="dark"] .contact-payment-copy h2,
+:root[data-theme="dark"] .partners-business-panel h2,
+:root[data-theme="dark"] .partners-wakala-card h2,
+:root[data-theme="dark"] .contact-wakala-card h2 {
+  color: #e8f5ed;
+}
+
+:root[data-theme="dark"] .story-copy .eyebrow,
+:root[data-theme="dark"] .story-copy .text-link,
+:root[data-theme="dark"] .text-link,
+:root[data-theme="dark"] .inline-link,
+:root[data-theme="dark"] .contact-card a,
+:root[data-theme="dark"] .contact-intro-section .inline-link,
+:root[data-theme="dark"] .faq-reference-list .faq-answer a { color: var(--fresh); }
+:root[data-theme="dark"] .partners-wakala-label { color: var(--gold); }
+:root[data-theme="dark"] .faq-reference-list .faq-answer { color: #bfd0c5; }
+:root[data-theme="dark"] .contact-wakala-card .wakala-actions a small:last-child { background: transparent; color: #e8f5ed; }
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea,
+:root[data-theme="dark"] .faq-search { color: #e8f5ed; }
+:root[data-theme="dark"] .field input::placeholder,
+:root[data-theme="dark"] .field textarea::placeholder,
+:root[data-theme="dark"] .faq-search::placeholder { color: #91a99b; }
+:root[data-theme="dark"] .footer { background: #061811; }
+
+:root[data-theme="dark"] .hero,
+:root[data-theme="dark"] .page-hero,
+:root[data-theme="dark"] .section-green,
+:root[data-theme="dark"] .note-card,
+:root[data-theme="dark"] .products-quote,
+:root[data-theme="dark"] .payment-card,
+:root[data-theme="dark"] .footer { color: #f4fff7; }
+:root[data-theme="dark"] .hero h1,
+:root[data-theme="dark"] .page-hero h1,
+:root[data-theme="dark"] .section-green h1,
+:root[data-theme="dark"] .section-green h2,
+:root[data-theme="dark"] .section-green h3,
+:root[data-theme="dark"] .section-green .section-heading > p,
+:root[data-theme="dark"] .home-impact-summary h2,
+:root[data-theme="dark"] .home-footer .footer-name,
+:root[data-theme="dark"] .home-footer h3,
+:root[data-theme="dark"] .button-green,
+:root[data-theme="dark"] .button-outline-light { color: #f4fff7; }
+:root[data-theme="dark"] .category-card span,
+:root[data-theme="dark"] .lighting-card strong,
+:root[data-theme="dark"] .stove-card h3,
+:root[data-theme="dark"] .journey-card strong,
+:root[data-theme="dark"] .person-card h3,
+:root[data-theme="dark"] .customer-card blockquote,
+:root[data-theme="dark"] .customer-card cite strong,
+:root[data-theme="dark"] .impact-gallery strong,
+:root[data-theme="dark"] .partners-funder-card span { color: #bfe9ce; }
+
+@media (max-width: 1040px) {
+  :root[data-theme="dark"] .nav-menu { background: var(--surface); border-bottom-color: var(--line); }
+  :root[data-theme="dark"] .nav-actions { border-top-color: var(--line); }
+  .nav-actions { flex-wrap: wrap; min-width: 0; }
+  .nav-actions .theme-toggle { flex: 0 0 40px; width: 40px; height: 40px; }
+  .nav-actions .button-small { flex: 1 1 140px; min-width: 0; white-space: nowrap; }
+}

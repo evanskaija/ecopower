@@ -3736,7 +3736,7 @@
       request.setRequestHeader('x-api-version', '13');
       request.setRequestHeader('x-api-blob-request-id', `${storeId}:${Date.now()}:${Math.random().toString(16).slice(2)}`);
       request.setRequestHeader('x-content-length', String(file.size));
-      request.setRequestHeader('x-vercel-blob-access', 'private');
+      request.setRequestHeader('x-vercel-blob-access', 'public');
       request.setRequestHeader('x-content-type', file.type);
       request.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
@@ -3759,7 +3759,7 @@
     const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' }[file.type];
     if (!extension) throw new Error('Please upload a JPEG, PNG, WebP, AVIF or GIF image.');
     const uploadId = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => { const random = Math.random() * 16 | 0; const value = character === 'x' ? random : random & 3 | 8; return value.toString(16); });
-    const pathname = `private/${uploadId}.${extension}`;
+    const pathname = `public/${uploadId}.${extension}`;
     let tokenResult;
     try {
       tokenResult = await apiRequest('/api/media/client-upload', { method: 'POST', body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname, clientPayload: null, multipart: false } }) });

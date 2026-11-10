@@ -893,6 +893,9 @@
       $('#draft-status').textContent = page.draft?.[language] ? 'Draft loaded from database' : 'No draft saved yet';
       $('#draft-status').classList.toggle('is-saved', Boolean(page.draft?.[language]));
       updateLastUpdated(page.draft?.[language]?.updated_at || page.published?.[language]?.updated_at);
+      if (Array.isArray(page.image_conflicts) && page.image_conflicts.length) {
+        showToast(`${page.image_conflicts.length} old EN/SW image difference${page.image_conflicts.length === 1 ? '' : 's'} reconciled using the English value. Review the affected image if needed.`);
+      }
     } finally {
       loadingRemoteState = false;
     }
@@ -1478,18 +1481,60 @@
     if (!String(section).startsWith('block:')) return null;
     return dynamicBlocks(content).find((block) => `block:${block.id}` === section) || null;
   }
-  function contentForSection(section = activeSection) {
+  function contentForSection(section = activeSection, content = currentPageContent()) {
     if (section === '__new-content__') return addContentDraft?.block || {};
-    const dynamic = dynamicBlockForSection(section);
+    const dynamic = dynamicBlockForSection(section, content);
     if (dynamic) return dynamic;
-    if (activePage === 'products' && productsSectionIds.has(section) && section !== 'footer') return productsSectionContent(section);
-    if (activePage === 'about' && aboutSectionIds.has(section)) return aboutSectionContent(section);
-    if (activePage === 'team' && teamSectionIds.has(section)) return teamSectionContent(section);
-    if (activePage === 'impact' && impactSectionIds.has(section)) return impactSectionContent(section);
-    if (activePage === 'partners' && partnerSectionIds.has(section)) return partnerSectionContent(section);
-    if (activePage === 'faq' && faqSectionIds.has(section)) return faqSectionContent(section);
-    return activePage === 'home' ? state.draft[homeSectionSource(section)] : genericContent();
+    if (activePage === 'products' && productsSectionIds.has(section) && section !== 'footer') return productsSectionContent(section, content);
+    if (activePage === 'about' && aboutSectionIds.has(section)) return aboutSectionContent(section, content);
+    if (activePage === 'team' && teamSectionIds.has(section)) return teamSectionContent(section, content);
+    if (activePage === 'impact' && impactSectionIds.has(section)) return impactSectionContent(section, content);
+    if (activePage === 'partners' && partnerSectionIds.has(section)) return partnerSectionContent(section, content);
+    if (activePage === 'faq' && faqSectionIds.has(section)) return faqSectionContent(section, content);
+    return activePage === 'home' ? state.draft[homeSectionSource(section)] : content;
   }
+
+  function setSharedImageAt(section, path, value) {
+    if (section === '__new-content__' || activePage === 'home') {
+      setAt(contentForSection(section), path, value);
+      return;
+    }
+    const pageState = genericState(activePage);
+    const languages = pageState?.draftByLanguage || {};
+    let updated = false;
+    ['en', 'sw'].forEach((code) => {
+      const content = languages[code];
+      if (!content) return;
+      setAt(contentForSection(section, content), path, value);
+      updated = true;
+    });
+    if (!updated) setAt(contentForSection(section), path, value);
+  }
+
+  function addSharedCatalogItem(section, item) {
+    const pageState = genericState(activePage);
+    if (!pageState || activePage === 'home') return;
+    const catalogFor = {
+      products: productsCatalog,
+      about: aboutCatalog,
+      team: teamCatalog,
+      impact: impactCatalog,
+      partners: partnerCatalog,
+      faq: faqCatalog
+    }[activePage];
+    if (!catalogFor) return;
+    ['en', 'sw'].forEach((code) => {
+      const catalog = catalogFor(pageState.draftByLanguage?.[code]);
+      const target = catalog?.[section];
+      if (!target) return;
+      if (!Array.isArray(target.items)) target.items = [];
+      const alreadyPresent = item?.id
+        ? target.items.some((candidate) => candidate?.id === item.id)
+        : target.items.some((candidate) => candidate === item);
+      if (!alreadyPresent) target.items.push(clone(item));
+    });
+  }
+
   function blockCopyForEditor(block, code = language) {
     if (!block[code] || typeof block[code] !== 'object') block[code] = {};
     return block[code];
@@ -2404,6 +2449,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -2434,6 +2480,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -2462,6 +2509,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -2492,6 +2540,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -2525,6 +2574,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -2550,6 +2600,7 @@
       if (!target) return;
       if (!Array.isArray(target.items)) target.items = [];
       target.items.push(block);
+      addSharedCatalogItem(section, block);
       activeSection = section;
       addContentDraft = null;
       closeAddContent({ force: true });
@@ -3608,7 +3659,7 @@
       const targetSection = mediaTarget.section;
       const targetPath = mediaTarget.path;
       const selectedSrc = target.dataset.src;
-      setAt(contentForSection(targetSection), targetPath, selectedSrc);
+      setSharedImageAt(targetSection, targetPath, selectedSrc);
       draftChangeVersion += 1;
       closeMedia({ force: true });
       updateMediaPicker(targetPath, selectedSrc, targetSection);
@@ -3732,7 +3783,7 @@
     if (!uploaded?.id || !uploaded.src) throw new Error('The CMS did not return a usable stored image.');
     const item = { ...uploaded, name: uploaded.original_name, uploaded: true };
     state.media.unshift(item);
-    setAt(contentForSection(targetSection), targetPath, item.src);
+    setSharedImageAt(targetSection, targetPath, item.src);
     applyImportedMetadata(targetSection, targetPath, item);
     draftChangeVersion += 1;
     updateMediaPreview(item.src);

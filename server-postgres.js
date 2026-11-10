@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
 const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
+const { reconcileLanguageRecords } = require('./language-media.js');
 
 const ROOT = __dirname;
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || 'http://localhost:3000';
@@ -321,11 +322,13 @@ async function currentContent(executor, slug, status, language) {
   const row = (await query(executor, 'SELECT id, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2 AND language = $3', [id, status, language])).rows[0];
   return row ? { id: row.id, version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at } : null;
 }
-async function allContent(executor, slug, status) {
+async function allContent(executor, slug, status, options = {}) {
   const id = await pageId(executor, slug);
   if (!id) return {};
   const result = await query(executor, 'SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = $1 AND status = $2', [id, status]);
-  return Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
+  const records = Object.fromEntries(result.rows.map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
+  const reconciled = reconcileLanguageRecords(records);
+  return options.withConflicts ? reconciled : reconciled.records;
 }
 async function saveContent(executor, slug, status, content, userId, language = 'en') {
   const id = await pageId(executor, slug);
@@ -469,7 +472,9 @@ app.get('/api/pages/:slug', requireAuth, async (req, res, next) => {
     if (!page) return res.status(404).json({ error: 'Page not found.' });
     const pageKey = await pageId(pool, req.params.slug);
     const revisions = (await query(pool, 'SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = $1 ORDER BY created_at DESC LIMIT 50', [pageKey])).rows;
-    res.json({ page, draft: await allContent(pool, req.params.slug, 'draft'), published: await allContent(pool, req.params.slug, 'published'), revisions });
+    const draft = await allContent(pool, req.params.slug, 'draft', { withConflicts: true });
+    const published = await allContent(pool, req.params.slug, 'published', { withConflicts: true });
+    res.json({ page, draft: draft.records, published: published.records, image_conflicts: [...draft.conflicts, ...published.conflicts], revisions });
   } catch (error) { next(error); }
 });
 app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
@@ -486,7 +491,8 @@ app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'ed
     const result = await saveContent(pool, req.params.slug, 'draft', req.body.content, req.user.id, language);
     audit(req, 'draft.save', req.params.slug, { language, version: result.version });
     if (changedPaymentFields.length) audit(req, 'payment.details.update', req.params.slug, { language, fields: changedPaymentFields });
-    res.json({ ok: true, ...result, draft: await allContent(pool, req.params.slug, 'draft') });
+    const draft = await allContent(pool, req.params.slug, 'draft', { withConflicts: true });
+    res.json({ ok: true, ...result, draft: draft.records, image_conflicts: draft.conflicts });
   } catch (error) { next(error); }
 });
 app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'), async (req, res, next) => {
@@ -515,7 +521,8 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
     await client.query('COMMIT');
     audit(req, 'publish', req.params.slug, { languages });
     const revisions = (await query(client, 'SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = $1 ORDER BY created_at DESC LIMIT 50', [page.id])).rows;
-    res.json({ ok: true, published: await allContent(client, req.params.slug, 'published'), revisions });
+    const published = await allContent(client, req.params.slug, 'published', { withConflicts: true });
+    res.json({ ok: true, published: published.records, image_conflicts: published.conflicts, revisions });
   } catch (error) {
     try { await client.query('ROLLBACK'); } catch {}
     next(error);
@@ -528,7 +535,8 @@ app.post('/api/pages/:slug/restore/:revisionId', requireAuth, requireRole('owner
     if (!revision || revision.page_id !== pageKey) return res.status(404).json({ error: 'Revision not found.' });
     await saveContent(pool, req.params.slug, 'draft', withBlocks(parseJson(revision.content_json), parseJson(revision.blocks_json)), req.user.id, revision.language);
     audit(req, 'revision.restore', req.params.slug, { revisionId: revision.id });
-    res.json({ ok: true, draft: await allContent(pool, req.params.slug, 'draft') });
+    const draft = await allContent(pool, req.params.slug, 'draft', { withConflicts: true });
+    res.json({ ok: true, draft: draft.records, image_conflicts: draft.conflicts });
   } catch (error) { next(error); }
 });
 app.get('/api/public/:slug', async (req, res, next) => {

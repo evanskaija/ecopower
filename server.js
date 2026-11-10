@@ -13,6 +13,7 @@ const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
 const Database = require('better-sqlite3');
 const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
+const { reconcileLanguageRecords } = require('./language-media.js');
 
 const ROOT = __dirname;
 const DATA_DIR = path.resolve(ROOT, 'data');
@@ -289,10 +290,12 @@ function currentContent(slug, status, language) {
   return row ? { id: row.id, version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at } : null;
 }
 
-function allContent(slug, status) {
+function allContent(slug, status, options = {}) {
   const id = pageId(slug);
   if (!id) return {};
-  return Object.fromEntries(db.prepare('SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
+  const records = Object.fromEntries(db.prepare('SELECT language, version, content_json, blocks_json, updated_at FROM page_content WHERE page_id = ? AND status = ?').all(id, status).map((row) => [row.language, { version: row.version, content: normalizeHomeContent(slug, currentBlockRecord(row)), updated_at: row.updated_at }]));
+  const reconciled = reconcileLanguageRecords(records);
+  return options.withConflicts ? reconciled : reconciled.records;
 }
 
 function saveContent(slug, status, content, userId, language = 'en') {
@@ -440,7 +443,9 @@ app.get('/api/pages', requireAuth, (_req, res) => res.json({ pages: db.prepare('
 app.get('/api/pages/:slug', requireAuth, (req, res) => {
   const page = db.prepare('SELECT slug, name, sort_order FROM pages WHERE slug = ?').get(req.params.slug);
   if (!page) return res.status(404).json({ error: 'Page not found.' });
-  res.json({ page, draft: allContent(req.params.slug, 'draft'), published: allContent(req.params.slug, 'published'), revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(pageId(req.params.slug)) });
+  const draft = allContent(req.params.slug, 'draft', { withConflicts: true });
+  const published = allContent(req.params.slug, 'published', { withConflicts: true });
+  res.json({ page, draft: draft.records, published: published.records, image_conflicts: [...draft.conflicts, ...published.conflicts], revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(pageId(req.params.slug)) });
 });
 
 app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res) => {
@@ -458,7 +463,8 @@ app.put('/api/pages/:slug/draft', requireAuth, requireRole('owner', 'admin', 'ed
   const result = saveContent(req.params.slug, 'draft', req.body.content, req.user.id, language);
   audit(req, 'draft.save', req.params.slug, { language, version: result.version });
   if (changedPaymentFields.length) audit(req, 'payment.details.update', req.params.slug, { language, fields: changedPaymentFields });
-  res.json({ ok: true, ...result, draft: allContent(req.params.slug, 'draft') });
+  const draft = allContent(req.params.slug, 'draft', { withConflicts: true });
+  res.json({ ok: true, ...result, draft: draft.records, image_conflicts: draft.conflicts });
 });
 
 app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'), async (req, res) => {
@@ -488,7 +494,8 @@ app.post('/api/pages/:slug/publish', requireAuth, requireRole('owner', 'admin'),
     });
     publishTransaction();
     audit(req, 'publish', req.params.slug, { languages });
-    res.json({ ok: true, published: allContent(req.params.slug, 'published'), revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(page.id) });
+    const published = allContent(req.params.slug, 'published', { withConflicts: true });
+    res.json({ ok: true, published: published.records, image_conflicts: published.conflicts, revisions: db.prepare('SELECT id, language, version, created_at, created_by FROM content_revisions WHERE page_id = ? ORDER BY created_at DESC LIMIT 50').all(page.id) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message || 'Publishing failed. The draft remains available.' });
@@ -500,7 +507,8 @@ app.post('/api/pages/:slug/restore/:revisionId', requireAuth, requireRole('owner
   if (!revision || revision.page_id !== pageId(req.params.slug)) return res.status(404).json({ error: 'Revision not found.' });
   saveContent(req.params.slug, 'draft', withBlocks(parseJson(revision.content_json), parseJson(revision.blocks_json)), req.user.id, revision.language);
   audit(req, 'revision.restore', req.params.slug, { revisionId: revision.id });
-  res.json({ ok: true, draft: allContent(req.params.slug, 'draft') });
+  const draft = allContent(req.params.slug, 'draft', { withConflicts: true });
+  res.json({ ok: true, draft: draft.records, image_conflicts: draft.conflicts });
 });
 
 app.get('/api/public/:slug', (req, res) => {

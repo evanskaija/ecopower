@@ -325,6 +325,32 @@ async function main() {
     assert.equal(result.body.published.en.content.blocks.length, 0, 'deleted test section should be absent after publish');
     assert.equal(result.body.published.sw.content.blocks.length, 0, 'deleted Swahili test section should be absent after publish');
 
+    // Shared media regression: changing an image in one language must update
+    // the same content item in the other language without changing its copy.
+    const bilingualImagePages = ['home', 'products', 'about', 'team', 'impact', 'partners', 'faq', 'contact'];
+    const sharedImageContent = (image, position, code) => ({
+      bilingualImageFixture: {
+        image,
+        position,
+        en: { title: 'English fixture', description: 'English copy stays separate.' },
+        sw: { title: 'Kiswahili fixture', description: 'Maandishi ya Kiswahili yanabaki tofauti.' },
+        savedIn: code
+      }
+    });
+    for (const slug of bilingualImagePages) {
+      await request(`/api/pages/${slug}/draft`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'sw', content: sharedImageContent(`media:${productImage.id}`, 'left', 'sw') }) });
+      result = await request(`/api/pages/${slug}/draft`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ language: 'en', content: sharedImageContent(`media:${heroImage.id}`, 'right', 'en') }) });
+      assert.equal(result.response.status, 200, `${slug} bilingual image draft should save`);
+      assert.equal(result.body.draft.en.content.bilingualImageFixture.image, `media:${heroImage.id}`, `${slug} EN should use the newly selected shared image`);
+      assert.equal(result.body.draft.sw.content.bilingualImageFixture.image, `media:${heroImage.id}`, `${slug} SW should use the same shared image`);
+      assert.equal(result.body.draft.en.content.bilingualImageFixture.position, 'right', `${slug} EN should keep the shared image position`);
+      assert.equal(result.body.draft.sw.content.bilingualImageFixture.position, 'right', `${slug} SW should keep the shared image position`);
+      assert.equal(result.body.draft.sw.content.bilingualImageFixture.sw.title, 'Kiswahili fixture', `${slug} SW copy should remain unchanged`);
+      result = await request(`/api/pages/${slug}/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      assert.equal(result.response.status, 200, `${slug} bilingual image draft should publish`);
+      assert.equal(result.body.published.en.content.bilingualImageFixture.image, result.body.published.sw.content.bilingualImageFixture.image, `${slug} published EN and SW should keep one image URL`);
+    }
+
     result = await request('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'contact', name: 'Smoke Customer', phone: '0784 017 225', message: 'Smoke-test enquiry' }) });
     assert.equal(result.response.status, 201, 'public contact form should store a message');
     result = await request('/api/messages');
@@ -338,7 +364,7 @@ async function main() {
     result = await request('/api/settings');
     assert.equal(result.body.settings.email, 'smoke@ecopower.local', 'website settings should persist in the database');
 
-    console.log('SMOKE TEST PASSED: authentication, all page image publishing, dynamic block draft/publish/reorder/delete, image delivery, messages and settings.');
+    console.log('SMOKE TEST PASSED: authentication, all page image publishing, bilingual shared-media consistency, dynamic block draft/publish/reorder/delete, image delivery, messages and settings.');
   } finally {
     await new Promise((resolve) => server.close(resolve));
     db.close();

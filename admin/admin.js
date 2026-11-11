@@ -133,7 +133,7 @@
 
   const baseContent = {
     hero: {
-      image: 'EcoPower_all_extracted_images/page_01_image_003.jpeg',
+      image: 'EcoPower_all_extracted_images/Glowing Charcoal and Dancing Flames.png',
       primaryLink: 'https://wa.me/255784017225',
       secondaryLink: '#how-it-works',
       en: { eyebrow: 'CLEAN COOKING FUEL BY ECOPOWER · DAR ES SALAAM', title: 'Makange — Kwa maisha', emphasis: 'bora.', description: 'Clean cooking fuel, delivered to your door. Briquettes made from char, agro and forest waste at our factory in Kunduchi, brought to your door by our own Toyo tricycles.', primaryLabel: 'Order on WhatsApp', secondaryLabel: 'How to pay', captionContact: 'Call or WhatsApp', caption: 'Pay cash on delivery or by Lipa Namba', alt: 'Makange delivery briquettes arriving by Toyo tricycle' },
@@ -200,11 +200,13 @@
     footer: { en: { brand: 'EcoPower Solutions Ltd', description: 'Makange — Kwa maisha bora. Clean cooking fuel, delivered to your door.', contactHeading: 'Order & contact', phone: 'Call / WhatsApp: 0784 017 225', email: 'info@ecopower.co.tz', address: 'Old Bagamoyo Road, Plot 234, Block D, Silver Sands, Kunduchi, Dar es Salaam', paymentHeading: 'Pay', mpesa: 'M-Pesa Lipa Namba 352491280', crdb: 'CRDB Lipa Namba 104084772', cash: 'Cash on delivery', socialHeading: 'Follow us', socialOne: 'Instagram · Facebook · TikTok', socialTwo: 'LinkedIn (company page) · Google' }, sw: { brand: 'EcoPower Solutions Ltd', description: 'Makange — Kwa maisha bora. Nishati safi ya kupikia, ikiletwa mlangoni kwako.', contactHeading: 'Agizo na mawasiliano', phone: 'Piga simu / WhatsApp: 0784 017 225', email: 'info@ecopower.co.tz', address: 'Old Bagamoyo Road, Plot 234, Block D, Silver Sands, Kunduchi, Dar es Salaam', paymentHeading: 'Malipo', mpesa: 'M-Pesa Lipa Namba 352491280', crdb: 'CRDB Lipa Namba 104084772', cash: 'Lipa wakati wa kupokea', socialHeading: 'Tufuatilie', socialOne: 'Instagram · Facebook · TikTok', socialTwo: 'LinkedIn (ukurasa wa kampuni) · Google' } }
   };
 
+  baseContent.hero.en.alt = 'Glowing charcoal briquettes and dancing flames';
+  baseContent.hero.sw.alt = 'Mkaa unaong’aa na miali ya moto';
   baseContent.blocks = [];
 
   const initialMedia = [
     ['hero-brand', 'Makange brand mark', 'EcoPower_all_extracted_images/page_01_image_002.png'],
-    ['hero-delivery', 'Hero delivery tricycle', 'EcoPower_all_extracted_images/page_01_image_003.jpeg'],
+    ['hero-flames', 'Glowing charcoal briquettes and dancing flames', 'EcoPower_all_extracted_images/Glowing Charcoal and Dancing Flames.png'],
     ['hero-briquette', 'Makange briquette press', 'EcoPower_all_extracted_images/page_01_image_008.jpeg'],
     ['product-50kg', '50kg Makange sack', 'EcoPower_all_extracted_images/page_01_image_004.jpeg'],
     ['product-25kg', '25kg Makange sack', 'EcoPower_all_extracted_images/page_01_image_005.jpeg'],
@@ -349,7 +351,7 @@
       sw: { title: 'Wateja wetu', format: { ...textFormatDefaults } },
       items: [
         { id: 'impact-customer-aizak', image: 'EcoPower_all_extracted_images/page_06_image_037.jpeg', position: 'center', displayOrder: 1, visible: true, en: { name: 'Mama Aizak', location: 'Kunduchi', occupation: 'Mmiliki wa mgahawa', quoteSw: 'Moto wa Makange unakaa muda mrefu, sufuria hazijai masizi, na mwisho wa mwezi naona faida.', quoteEn: 'The Makange fire lasts a long time, my pots don’t get covered in soot, and at the end of the month I see the profit.', alt: 'Mama Aizak, Makange customer', format: { ...textFormatDefaults } }, sw: { name: 'Mama Aizak', location: 'Kunduchi', occupation: 'Mmiliki wa mgahawa', quoteSw: 'Moto wa Makange unakaa muda mrefu, sufuria hazijai masizi, na mwisho wa mwezi naona faida.', quoteEn: 'The Makange fire lasts a long time, my pots don’t get covered in soot, and at the end of the month I see the profit.', alt: 'Mama Aizak, mteja wa Makange', format: { ...textFormatDefaults } } },
-        { id: 'impact-customer-amina', image: 'EcoPower_all_extracted_images/page_06_image_038.jpeg', position: 'center', displayOrder: 2, visible: true, en: { name: 'Amina', location: 'Kurasini', occupation: 'Mama ntilie', quoteSw: 'Ugali unatoka moto mkali usiokata. Makange inanipa moto huo kila siku, bila kuongezea mkaa kila mara.', quoteEn: 'Ugali needs a strong fire that doesn’t die down. Makange gives me that fire every day, without topping up all the time.', alt: 'Amina, Makange customer', format: { ...textFormatDefaults } }, sw: { name: 'Amina', location: 'Kurasini', occupation: 'Mama ntilie', quoteSw: 'Ugali unatoka moto mkali usiokata. Makange inanipa moto huo kila siku, bila kuongezea mkaa kila mara.', quoteEn: 'Ugali needs a strong fire that doesn’t die down. Makange gives me that fire every day, without topping up all the time.', alt: 'Amina, mteja wa Makange', format: { ...textFormatDefaults } } }
+        { id: 'impact-customer-amina', image: 'EcoPower_all_extracted_images/page_06_image_038.jpeg', position: 'center', displayOrder: 2, visible: true, en: { name: 'Amina', location: 'Kurasini', occupation: 'Mama ntilie', quoteSw: 'Ugali unataka moto mkali usiokata. Makange inanipa moto huo kila siku, bila kuongeza mkaa kila mara.', quoteEn: 'Ugali needs a strong fire that doesn’t die down. Makange gives me that fire every day, without topping up all the time.', alt: 'Amina, Makange customer', format: { ...textFormatDefaults } }, sw: { name: 'Amina', location: 'Kurasini', occupation: 'Mama ntilie', quoteSw: 'Ugali unataka moto mkali usiokata. Makange inanipa moto huo kila siku, bila kuongeza mkaa kila mara.', quoteEn: 'Ugali needs a strong fire that doesn’t die down. Makange gives me that fire every day, without topping up all the time.', alt: 'Amina, mteja wa Makange', format: { ...textFormatDefaults } } }
       ]
     },
     comparison: {

@@ -10,8 +10,8 @@
       return null;
     }
   };
-  const systemTheme = () => (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  const initialTheme = readStoredTheme() || systemTheme();
+  // Light mode is the default; only an explicit saved choice should override it.
+  const initialTheme = readStoredTheme() || 'light';
 
   const applyTheme = (theme, persist) => {
     const nextTheme = isTheme(theme) ? theme : 'light';
@@ -41,15 +41,6 @@
     set: (theme) => applyTheme(theme, true),
     toggle: () => applyTheme((document.documentElement.dataset.theme || initialTheme) === 'dark' ? 'light' : 'dark', true)
   };
-
-  const mediaQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-  if (mediaQuery) {
-    const onSystemThemeChange = () => {
-      if (!readStoredTheme()) applyTheme(systemTheme(), false);
-    };
-    if (mediaQuery.addEventListener) mediaQuery.addEventListener('change', onSystemThemeChange);
-    else if (mediaQuery.addListener) mediaQuery.addListener(onSystemThemeChange);
-  }
 
   const createToggle = (isAdmin) => {
     const button = document.createElement('button');

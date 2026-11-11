@@ -1723,7 +1723,15 @@ document.querySelectorAll('.footer-col').forEach((column) => {
   column.append(links);
 });
 
-const storedLanguage = localStorage.getItem('ecopower-language') || document.documentElement.lang || 'en';
+// English is the default language; only an explicit Swahili choice overrides it.
+const readStoredLanguage = () => {
+  try {
+    return localStorage.getItem('ecopower-language') === 'sw' ? 'sw' : 'en';
+  } catch {
+    return 'en';
+  }
+};
+const storedLanguage = readStoredLanguage();
 setLanguage(storedLanguage);
 if (document.body.dataset.page === 'home' && new URLSearchParams(window.location.search).get('externalPreview') === '1') void syncCmsHomeContent(storedLanguage, true);
 if (window.parent !== window) window.parent.postMessage({ type: 'ecopower-cms-preview-ready' }, window.location.origin);

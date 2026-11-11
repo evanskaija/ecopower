@@ -1723,6 +1723,65 @@ document.querySelectorAll('.footer-col').forEach((column) => {
   column.append(links);
 });
 
+const setupHeroVideoRotation = () => {
+  const stacks = [...document.querySelectorAll('[data-video-rotation]')];
+  if (!stacks.length) return;
+
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  stacks.forEach((stack) => {
+    const videos = [...stack.querySelectorAll('video')];
+    if (videos.length < 2) return;
+
+    let activeIndex = videos.findIndex((video) => video.classList.contains('is-active'));
+    if (activeIndex < 0) activeIndex = 0;
+
+    const syncVideoState = () => {
+      videos.forEach((video, index) => {
+        const isActive = index === activeIndex;
+        video.classList.toggle('is-active', isActive);
+        video.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+      });
+    };
+
+    const playVideo = (video) => {
+      const playPromise = video.play();
+      if (playPromise?.catch) playPromise.catch(() => {});
+    };
+
+    const resetVideo = (video) => {
+      try {
+        video.currentTime = 0;
+      } catch {
+        // The browser may not have loaded metadata yet.
+      }
+    };
+
+    const rotate = () => {
+      const current = videos[activeIndex];
+      activeIndex = (activeIndex + 1) % videos.length;
+      const next = videos[activeIndex];
+      current.pause();
+      resetVideo(current);
+      resetVideo(next);
+      syncVideoState();
+      playVideo(next);
+    };
+
+    syncVideoState();
+    if (prefersReducedMotion) return;
+    window.setInterval(rotate, 6000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        videos.forEach((video) => video.pause());
+      } else {
+        playVideo(videos[activeIndex]);
+      }
+    });
+  });
+};
+
+setupHeroVideoRotation();
+
 // English is the default language; only an explicit Swahili choice overrides it.
 const readStoredLanguage = () => {
   try {

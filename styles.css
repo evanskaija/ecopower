@@ -2156,7 +2156,7 @@ html[data-theme="dark"] body {
   .hero-video-stack .hero-video-extra.is-active {
     width: 100% !important;
     max-width: none;
-    transform: scale(1.8) !important;
+    transform: scale(2.15) !important;
     transform-origin: center center;
   }
 }

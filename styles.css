@@ -2049,7 +2049,7 @@ html[data-theme="dark"] body {
     min-height: 0;
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: 18px;
     overflow: visible;
   }
 
@@ -2156,7 +2156,7 @@ html[data-theme="dark"] body {
   .hero-video-stack .hero-video-extra.is-active {
     width: 100% !important;
     max-width: none;
-    transform: scale(2.15) !important;
+    transform: scale(2.55) !important;
     transform-origin: center center;
   }
 }

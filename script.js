@@ -1723,58 +1723,209 @@ document.querySelectorAll('.footer-col').forEach((column) => {
   column.append(links);
 });
 
+const HERO_ROTATING_MEDIA = [
+  {
+    key: 'double-cooker-burning-flames',
+    type: 'video',
+    brownReduced: true,
+    poster: 'EcoPower_all_extracted_images/Charcoal_cooker_with_burning_flames_9ac7f91c-nobg-poster.png',
+    label: 'Charcoal cooker with burning flames',
+    details: {
+      kicker: 'For homes',
+      title: 'Household stove',
+      price: 'TZS 30,000',
+      description: 'A compact stove for the home kitchen, with pot rests and carry handles, for everyday family cooking with Makange.',
+    },
+    sources: [
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_with_burning_flames_9ac7f91c-nobg%20(1).webm',
+        type: 'video/webm',
+      },
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_with_burning_flames_9ac7f91c-nobg%20(1).mov',
+        type: 'video/quicktime',
+      },
+    ],
+  },
+  {
+    key: 'wide-cooker-burning-flames',
+    type: 'video',
+    redReduced: true,
+    poster: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_flames_9ce5304b-nobg-poster.png',
+    label: 'Charcoal cooker burning flames',
+    details: {
+      kicker: 'For restaurants & busy kitchens',
+      title: 'Two-burner stove',
+      price: 'TZS 60,000',
+      description: 'Two fire chambers on one steel stand, so two pots cook at once — for restaurants, canteens and caterers.',
+    },
+    sources: [
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_flames_9ce5304b-nobg.webm',
+        type: 'video/webm',
+      },
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_flames_9ce5304b-nobg.mov',
+        type: 'video/quicktime',
+      },
+    ],
+  },
+  {
+    key: 'single-cooker-burning-flames',
+    type: 'video',
+    compact: true,
+    poster: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_with_flames_e0855849-nobg-poster.png',
+    label: 'Charcoal cooker burning with flames',
+    details: {
+      kicker: 'For mama ntilie & food sellers',
+      title: 'Mama ntilie stove',
+      price: 'TZS 80,000',
+      description: 'A wide fire grate for big sufuria and long cooking hours — for mama ntilie, chips stalls and small restaurants.',
+    },
+    sources: [
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_with_flames_e0855849-nobg.webm',
+        type: 'video/webm',
+      },
+      {
+        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_with_flames_e0855849-nobg.mov',
+        type: 'video/quicktime',
+      },
+    ],
+  },
+  {
+    key: 'six-charcoal-briquette-sacks',
+    type: 'image',
+    src: 'EcoPower_all_extracted_images/Six_Sacks_of_Charcoal_Briquettes-removebg-preview.png',
+    label: 'Six sacks of charcoal briquettes',
+    details: {
+      kicker: 'Clean cooking fuel',
+      title: 'Makange briquettes',
+      price: 'TZS 22,000 / 50kg',
+      description: 'Made from char, agro and forest waste. The 25kg sack is TZS 13,000, with delivery available for bulk orders.',
+    },
+  },
+];
+
+const addHeroRotatingMedia = (stack) => {
+  if (stack.dataset.heroMediaReady === 'true') return;
+
+  // The hero should rotate only through the two requested folder assets.
+  stack.querySelectorAll('video, img').forEach((media) => media.remove());
+  stack.setAttribute('aria-label', 'EcoPower cooker and briquette media');
+
+  HERO_ROTATING_MEDIA.forEach((asset) => {
+    const media = document.createElement(asset.type === 'image' ? 'img' : asset.type);
+    media.className = asset.type === 'video'
+      ? `hero-video hero-media-slide${asset.compact ? ' hero-video-extra' : ''}${asset.brownReduced ? ' hero-video-brown-reduced' : ''}${asset.redReduced ? ' hero-video-red-reduced' : ''}`
+      : 'hero-media-slide hero-media-image';
+    media.dataset.heroMedia = asset.key;
+    media.setAttribute('aria-hidden', 'true');
+
+    if (asset.type === 'video') {
+      media.autoplay = false;
+      media.muted = true;
+      media.loop = true;
+      media.playsInline = true;
+      media.preload = 'metadata';
+      media.poster = asset.poster;
+      media.setAttribute('aria-label', asset.label);
+      asset.sources.forEach((source) => {
+        const sourceElement = document.createElement('source');
+        sourceElement.src = source.src;
+        sourceElement.type = source.type;
+        media.append(sourceElement);
+      });
+    } else {
+      media.src = asset.src;
+      media.alt = asset.label;
+      media.loading = 'eager';
+      media.decoding = 'async';
+    }
+
+    stack.append(media);
+  });
+
+  stack.dataset.heroMediaReady = 'true';
+};
+
 const setupHeroVideoRotation = () => {
   const stacks = [...document.querySelectorAll('[data-video-rotation]')];
   if (!stacks.length) return;
 
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   stacks.forEach((stack) => {
-    const videos = [...stack.querySelectorAll('video')];
-    if (videos.length < 2) return;
+    addHeroRotatingMedia(stack);
+    const media = [...stack.querySelectorAll('video, img')];
+    if (media.length < 2) return;
 
-    let activeIndex = videos.findIndex((video) => video.classList.contains('is-active'));
+    const detailsPanel = stack.closest('.hero-visual')?.querySelector('.price-panel');
+    if (detailsPanel) {
+      detailsPanel.classList.add('hero-item-details');
+      detailsPanel.dataset.heroItemDetails = 'true';
+      detailsPanel.setAttribute('aria-live', 'polite');
+      detailsPanel.setAttribute('aria-label', 'Selected EcoPower product details');
+    }
+
+    let activeIndex = media.findIndex((item) => item.classList.contains('is-active'));
     if (activeIndex < 0) activeIndex = 0;
 
     const syncVideoState = () => {
-      videos.forEach((video, index) => {
+      const nextIndex = (activeIndex + 1) % media.length;
+      const previousIndex = (activeIndex - 1 + media.length) % media.length;
+      const activeAsset = HERO_ROTATING_MEDIA.find((asset) => asset.key === media[activeIndex].dataset.heroMedia);
+      media.forEach((item, index) => {
         const isActive = index === activeIndex;
-        video.classList.toggle('is-active', isActive);
-        video.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+        const isNext = index === nextIndex && !isActive;
+        const isPrevious = index === previousIndex && !isActive && !isNext;
+        item.classList.toggle('is-active', isActive);
+        item.classList.toggle('is-next', isNext);
+        item.classList.toggle('is-previous', isPrevious);
+        item.setAttribute('aria-hidden', isActive ? 'false' : 'true');
       });
+
+      if (detailsPanel && activeAsset?.details) {
+        detailsPanel.innerHTML = '';
+        const kicker = document.createElement('span');
+        kicker.className = 'hero-item-kicker';
+        kicker.textContent = activeAsset.details.kicker;
+        const title = document.createElement('h3');
+        title.textContent = activeAsset.details.title;
+        const price = document.createElement('strong');
+        price.className = 'hero-item-price';
+        price.textContent = activeAsset.details.price;
+        const description = document.createElement('p');
+        description.className = 'hero-item-description';
+        description.textContent = activeAsset.details.description;
+        detailsPanel.append(kicker, title, price, description);
+      }
     };
 
     const playVideo = (video) => {
+      if (video.tagName !== 'VIDEO') return;
       const playPromise = video.play();
       if (playPromise?.catch) playPromise.catch(() => {});
     };
 
-    const resetVideo = (video) => {
-      try {
-        video.currentTime = 0;
-      } catch {
-        // The browser may not have loaded metadata yet.
-      }
+    const playAllVideos = () => {
+      media.filter((item) => item.tagName === 'VIDEO').forEach(playVideo);
     };
 
     const rotate = () => {
-      const current = videos[activeIndex];
-      activeIndex = (activeIndex + 1) % videos.length;
-      const next = videos[activeIndex];
-      current.pause();
-      resetVideo(current);
-      resetVideo(next);
+      activeIndex = (activeIndex + 1) % media.length;
       syncVideoState();
-      playVideo(next);
+      playAllVideos();
     };
 
     syncVideoState();
     if (prefersReducedMotion) return;
+    playAllVideos();
     window.setInterval(rotate, 6000);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        videos.forEach((video) => video.pause());
+        media.filter((item) => item.tagName === 'VIDEO').forEach((video) => video.pause());
       } else {
-        playVideo(videos[activeIndex]);
+        playAllVideos();
       }
     });
   });

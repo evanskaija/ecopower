@@ -8,3 +8,7 @@ uploads/published/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Keep source MOV masters out of GitHub; use optimized WebM or hosted video URLs.
+*.mov
+.local-video-archive/

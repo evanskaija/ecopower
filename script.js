@@ -1782,10 +1782,6 @@ const HERO_ROTATING_MEDIA = [
         src: 'EcoPower_all_extracted_images/Charcoal_cooker_with_burning_flames_9ac7f91c-nobg%20(1).webm',
         type: 'video/webm',
       },
-      {
-        src: 'EcoPower_all_extracted_images/Charcoal_cooker_with_burning_flames_9ac7f91c-nobg%20(1).mov',
-        type: 'video/quicktime',
-      },
     ],
   },
   {
@@ -1805,10 +1801,6 @@ const HERO_ROTATING_MEDIA = [
         src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_flames_9ce5304b-nobg.webm',
         type: 'video/webm',
       },
-      {
-        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_flames_9ce5304b-nobg.mov',
-        type: 'video/quicktime',
-      },
     ],
   },
   {
@@ -1827,10 +1819,6 @@ const HERO_ROTATING_MEDIA = [
       {
         src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_with_flames_e0855849-nobg.webm',
         type: 'video/webm',
-      },
-      {
-        src: 'EcoPower_all_extracted_images/Charcoal_cooker_burning_with_flames_e0855849-nobg.mov',
-        type: 'video/quicktime',
       },
     ],
   },

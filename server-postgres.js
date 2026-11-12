@@ -13,7 +13,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
-const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
+const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, MAX_SERVER_UPLOAD_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeImageMimeType, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
 const { reconcileLanguageRecords } = require('./language-media.js');
 
 const ROOT = __dirname;
@@ -96,7 +96,7 @@ app.use(session({
 }));
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, message: { error: 'Too many login attempts. Try again later.' } });
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_SIZE, files: 1 }, fileFilter: (_req, file, callback) => callback(null, ALLOWED_IMAGE_TYPES.has(file.mimetype)) });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_SERVER_UPLOAD_SIZE, files: 1 }, fileFilter: (_req, file, callback) => callback(null, Boolean(normalizeImageMimeType(file.originalname, file.mimetype))) });
 
 const query = (executor, text, values = []) => executor.query(text, values);
 const db = { query: (text, values) => pool.query(text, values), pool };
@@ -255,6 +255,10 @@ function assertBlobStore(url, expectedStoreId, label) {
   try { hostname = new URL(url).hostname.toLowerCase(); } catch { throw new Error(`${label} Blob returned an invalid URL.`); }
   if (!hostname.startsWith(`${String(expectedStoreId).toLowerCase()}.`)) throw new Error(`${label} Blob store ID does not match the configured ${VERCEL_ENV} store.`);
 }
+function blobStoreIdFromReadWriteToken(token) {
+  const match = String(token || '').match(/^vercel_blob_rw_([^_]+)_/);
+  return match?.[1] || '';
+}
 async function deletePrivateBlob(storagePath) {
   if (!storagePath || !PRIVATE_BLOB_TOKEN) return;
   try {
@@ -276,6 +280,9 @@ async function deletePublicBlob(storagePath) {
 function requirePublicBlobConfig() {
   if (!PUBLIC_BLOB_TOKEN) throw new Error(`${publicTokenName} is required before storing a public website image.`);
   if (!PUBLIC_BLOB_STORE_ID) throw new Error(`${publicStoreIdName} is required before storing a public website image.`);
+  const tokenStoreId = blobStoreIdFromReadWriteToken(PUBLIC_BLOB_TOKEN);
+  if (!tokenStoreId) throw new Error(`${publicTokenName} is not a valid Vercel Blob read-write token.`);
+  if (tokenStoreId.toLowerCase() !== String(PUBLIC_BLOB_STORE_ID).toLowerCase()) throw new Error(`${publicTokenName} does not belong to ${publicStoreIdName}.`);
 }
 async function storePrivateBlob({ pathname, buffer, contentType }) {
   if (!PRIVATE_BLOB_TOKEN) throw new Error(`${privateTokenName} is required before uploading an image.`);
@@ -592,6 +599,14 @@ app.get('/api/public/:slug', async (req, res, next) => {
 });
 
 app.get('/api/media', requireAuth, async (_req, res, next) => { try { const assets = (await query(pool, 'SELECT id, original_name, mime_type, file_size, width, height, alt_text_en, alt_text_sw, caption_en, caption_sw, description_en, description_sw, status, public_url, created_at FROM media_assets ORDER BY created_at DESC')).rows.map((asset) => ({ ...asset, src: `media:${asset.id}`, preview_url: `/api/media/${asset.id}/file` })); res.json({ media: assets }); } catch (error) { next(error); } });
+app.get('/api/media/blob-health', requireAuth, requireRole('owner', 'admin'), async (_req, res, next) => {
+  try {
+    requirePublicBlobConfig();
+    const { list } = require('@vercel/blob');
+    const result = await list({ token: PUBLIC_BLOB_TOKEN, prefix: 'public/', limit: 1 });
+    res.json({ environment: VERCEL_ENV, public_store_id: PUBLIC_BLOB_STORE_ID, public_token_configured: true, public_store_reachable: true, sample_blob_present: Boolean(result.blobs?.length) });
+  } catch (error) { next(error); }
+});
 app.patch('/api/media/:id', requireAuth, requireRole('owner', 'admin', 'editor'), async (req, res, next) => {
   try {
     let metadata;

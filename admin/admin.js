@@ -486,6 +486,20 @@
   let loadingRemoteState = false;
 
   const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+  const MAX_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024;
+  const MAX_SERVER_UPLOAD_SIZE = 4 * 1024 * 1024;
+  const IMAGE_MIME_TYPES_BY_EXTENSION = Object.freeze({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', avif: 'image/avif', gif: 'image/gif' });
+  const IMAGE_EXTENSIONS_BY_MIME = Object.freeze({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' });
+  function imageMimeTypeForFile(file) {
+    const declared = String(file?.type || '').split(';', 1)[0].trim().toLowerCase();
+    if (IMAGE_EXTENSIONS_BY_MIME[declared]) return declared;
+    const extension = String(file?.name || '').toLowerCase().split('.').pop();
+    return IMAGE_MIME_TYPES_BY_EXTENSION[extension] || '';
+  }
+  function fileWithMimeType(file, mimeType) {
+    if (file.type === mimeType) return file;
+    return new File([file], file.name, { type: mimeType, lastModified: file.lastModified });
+  }
   const assetUrl = (src = '') => src.startsWith('media:') ? `/api/media/${src.slice(6)}/file` : src.startsWith('data:') || src.startsWith('http') || src.startsWith('/') ? src : `../${src}`;
   const emptyImagePlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 100'%3E%3Crect width='160' height='100' fill='%23eaf0eb'/%3E%3Cpath d='M45 68l22-25 17 18 12-14 19 21z' fill='%23b7c9bc'/%3E%3Ccircle cx='101' cy='34' r='9' fill='%23b7c9bc'/%3E%3C/svg%3E";
   const getAt = (obj, path) => path.split('.').reduce((value, key) => value?.[key], obj);
@@ -3726,9 +3740,9 @@
     });
   }
 
-  function uploadBlobDirectly(pathname, clientToken, file, onProgress) {
+  function uploadBlobDirectly(pathname, clientToken, file, mimeType, onProgress) {
     return new Promise((resolve, reject) => {
-      const storeId = clientToken.split('_')[3];
+      const storeId = String(clientToken).match(/^vercel_blob_client_([^_]+)_/)?.[1];
       if (!storeId) return reject(new Error('The CMS returned an invalid secure upload token.'));
       const request = new XMLHttpRequest();
       const uploadUrl = `https://vercel.com/api/blob/?pathname=${encodeURIComponent(pathname)}`;
@@ -3737,9 +3751,10 @@
       request.setRequestHeader('x-vercel-blob-store-id', storeId);
       request.setRequestHeader('x-api-version', '13');
       request.setRequestHeader('x-api-blob-request-id', `${storeId}:${Date.now()}:${Math.random().toString(16).slice(2)}`);
+      request.setRequestHeader('x-api-blob-request-attempt', '0');
       request.setRequestHeader('x-content-length', String(file.size));
       request.setRequestHeader('x-vercel-blob-access', 'public');
-      request.setRequestHeader('x-content-type', file.type);
+      request.setRequestHeader('x-content-type', mimeType);
       request.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
       });
@@ -3757,9 +3772,10 @@
     });
   }
 
-  async function uploadMediaWithProgress(file, metadata, onProgress) {
-    const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' }[file.type];
-    if (!extension) throw new Error('Please upload a JPEG, PNG, WebP, AVIF or GIF image.');
+  async function uploadMediaWithProgress(file, metadata, onProgress, mimeType = imageMimeTypeForFile(file)) {
+    const extension = IMAGE_EXTENSIONS_BY_MIME[mimeType];
+    if (!extension) throw new Error('Please upload a JPG, JPEG, PNG, WebP, AVIF or GIF image.');
+    const uploadFile = fileWithMimeType(file, mimeType);
     const uploadId = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => { const random = Math.random() * 16 | 0; const value = character === 'x' ? random : random & 3 | 8; return value.toString(16); });
     const pathname = `public/${uploadId}.${extension}`;
     let tokenResult;
@@ -3767,16 +3783,17 @@
       tokenResult = await apiRequest('/api/media/client-upload', { method: 'POST', body: JSON.stringify({ type: 'blob.generate-client-token', payload: { pathname, clientPayload: null, multipart: false } }) });
     } catch (error) {
       if (error.status !== 404) throw error;
+      if (file.size > MAX_SERVER_UPLOAD_SIZE) throw new Error('The secure direct-upload endpoint is unavailable. Vercel server requests are limited to 4.5 MB; reconnect to the Preview deployment before retrying this image.');
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile, uploadFile.name);
       Object.entries(metadata).forEach(([key, value]) => formData.append(key, value));
       setMediaBusy(true, 'Uploading image to the CMS… 0%');
       return uploadMediaViaServer(formData, onProgress);
     }
     if (!tokenResult?.clientToken) throw new Error('The CMS could not prepare a secure image upload.');
-    await uploadBlobDirectly(pathname, tokenResult.clientToken, file, onProgress);
+    await uploadBlobDirectly(pathname, tokenResult.clientToken, uploadFile, mimeType, onProgress);
     setMediaBusy(true, 'Saving image metadata…');
-    const completed = await apiRequest('/api/media/client-upload/complete', { method: 'POST', body: JSON.stringify({ pathname, original_name: file.name, mime_type: file.type, metadata }) });
+    const completed = await apiRequest('/api/media/client-upload/complete', { method: 'POST', body: JSON.stringify({ pathname, original_name: file.name, mime_type: mimeType, metadata }) });
     if (!completed?.media) throw new Error('The CMS did not return the stored image record.');
     return completed.media;
   }
@@ -3810,8 +3827,9 @@
   const handleMediaFileChange = (event) => {
     const file = event.target.files?.[0];
     if (!file || !mediaTarget || mediaBusy) return;
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)) { showToast('Please upload a JPEG, PNG, WebP, AVIF or GIF image.'); return; }
-    if (file.size > 10 * 1024 * 1024) { showToast('Image must be smaller than 10 MB.'); return; }
+    const mimeType = imageMimeTypeForFile(file);
+    if (!mimeType) { showToast('Please upload a JPG, JPEG, PNG, WebP, AVIF or GIF image.'); return; }
+    if (file.size > MAX_IMAGE_UPLOAD_SIZE) { showToast('Image must be smaller than 10 MB.'); return; }
     showMediaFilePreview(file);
     setMediaStatus(`Selected ${file.name}. Preparing secure upload…`, 'busy');
     const targetSection = mediaTarget.section;
@@ -3820,7 +3838,7 @@
     setMediaBusy(true, 'Validating image…');
     setMediaStatus('Validating image…', 'busy');
     requestAnimationFrame(() => setMediaBusy(true, 'Uploading image to Preview Blob… 0%'));
-    uploadMediaWithProgress(file, metadata, (percent) => setMediaBusy(true, `Uploading image directly to Preview Blob… ${percent}%`)).then((uploaded) => assignUploadedMedia(uploaded, targetSection, targetPath, 'Image uploaded, saved to the draft, and ready to publish.')).catch((error) => { setMediaStatus(`Upload failed: ${error.message}`, 'error'); showToast(`Upload failed: ${error.message}`); }).finally(() => { setMediaBusy(false); event.target.value = ''; });
+    uploadMediaWithProgress(file, metadata, (percent) => setMediaBusy(true, `Uploading image directly to Preview Blob… ${percent}%`), mimeType).then((uploaded) => assignUploadedMedia(uploaded, targetSection, targetPath, 'Image uploaded, saved to the draft, and ready to publish.')).catch((error) => { setMediaStatus(`Upload failed: ${error.message}`, 'error'); showToast(`Upload failed: ${error.message}`); }).finally(() => { setMediaBusy(false); event.target.value = ''; });
   };
   const mediaFileInputs = [$('#media-upload')].filter(Boolean);
   const cameraInput = document.createElement('input');

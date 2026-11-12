@@ -5,10 +5,22 @@ const net = require('node:net');
 const crypto = require('node:crypto');
 const { imageSize } = require('image-size');
 
+// Direct Vercel Blob uploads are not subject to the Vercel Function request
+// body limit. Keep the larger image limit for that path, but cap the multipart
+// fallback below 4.5 MB so its request envelope remains inside Vercel's limit.
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_SERVER_UPLOAD_SIZE = 4 * 1024 * 1024;
 const REMOTE_FETCH_TIMEOUT_MS = 6000;
 const MAX_REMOTE_REDIRECTS = 3;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
+const IMAGE_MIME_TYPES_BY_EXTENSION = new Map([
+  ['jpg', 'image/jpeg'],
+  ['jpeg', 'image/jpeg'],
+  ['png', 'image/png'],
+  ['webp', 'image/webp'],
+  ['avif', 'image/avif'],
+  ['gif', 'image/gif']
+]);
 const MEDIA_METADATA_LIMITS = Object.freeze({
   alt_text_en: 250,
   alt_text_sw: 250,
@@ -24,6 +36,14 @@ const IMAGE_EXTENSIONS = new Map([
   ['image/avif', '.avif'],
   ['image/gif', '.gif']
 ]);
+
+function normalizeImageMimeType(fileName = '', declaredMime = '') {
+  const normalizedDeclared = String(declaredMime || '').split(';', 1)[0].trim().toLowerCase();
+  if (ALLOWED_IMAGE_TYPES.has(normalizedDeclared)) return normalizedDeclared;
+  if (normalizedDeclared && normalizedDeclared !== 'application/octet-stream') return '';
+  const extension = String(fileName || '').toLowerCase().split('.').pop();
+  return IMAGE_MIME_TYPES_BY_EXTENSION.get(extension) || '';
+}
 
 function normalizeHostname(hostname) {
   return String(hostname || '').replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
@@ -174,4 +194,4 @@ function validateImageReference(value) {
   return null;
 }
 
-module.exports = { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, MEDIA_METADATA_LIMITS, assertSafeRemoteDestination, assertSafeRemoteUrl, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference };
+module.exports = { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, MAX_SERVER_UPLOAD_SIZE, MEDIA_METADATA_LIMITS, assertSafeRemoteDestination, assertSafeRemoteUrl, fetchRemoteImage, inspectImageBuffer, normalizeImageMimeType, normalizeMediaMetadata, validateImageReference };

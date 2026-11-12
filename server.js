@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const cmsFields = require('./cms-fields.js');
 const Database = require('better-sqlite3');
-const { ALLOWED_IMAGE_TYPES, IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
+const { IMAGE_EXTENSIONS, MAX_IMAGE_SIZE, MAX_SERVER_UPLOAD_SIZE, assertSafeRemoteDestination, fetchRemoteImage, inspectImageBuffer, normalizeImageMimeType, normalizeMediaMetadata, validateImageReference } = require('./media-security.js');
 const { reconcileLanguageRecords } = require('./language-media.js');
 
 const ROOT = __dirname;
@@ -114,8 +114,8 @@ const upload = multer({
     destination: (_req, _file, callback) => callback(null, PRIVATE_UPLOAD_DIR),
     filename: (_req, file, callback) => callback(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
   }),
-  limits: { fileSize: MAX_IMAGE_SIZE, files: 1 },
-  fileFilter: (_req, file, callback) => callback(null, ALLOWED_IMAGE_TYPES.has(file.mimetype))
+  limits: { fileSize: process.env.NODE_ENV === 'production' ? MAX_SERVER_UPLOAD_SIZE : MAX_IMAGE_SIZE, files: 1 },
+  fileFilter: (_req, file, callback) => callback(null, Boolean(normalizeImageMimeType(file.originalname, file.mimetype)))
 });
 
 function pageId(slug) { return db.prepare('SELECT id FROM pages WHERE slug = ?').get(slug)?.id; }

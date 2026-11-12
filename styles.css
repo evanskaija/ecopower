@@ -2149,6 +2149,16 @@ html[data-theme="dark"] body {
   .trust-strip {
     margin-top: 14px;
   }
+
+  /* Portrait cooker media has transparent space above and below the product.
+     Scale only the active slide so the complete cooker and flame tips read
+     clearly on phones without changing the flow of the details card. */
+  .hero-video-stack .hero-video-extra.is-active {
+    width: 100% !important;
+    max-width: none;
+    transform: scale(1.8) !important;
+    transform-origin: center center;
+  }
 }
 
 @media (max-width: 380px) {

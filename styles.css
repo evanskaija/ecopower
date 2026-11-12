@@ -998,18 +998,24 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .contact-form-section .contact-form { padding: 22px; }
 }
 
-/* Scroll reveals: light directional movement with no layout shift */
-.scroll-reveal { opacity: 0; transform: translate3d(0, 24px, 0); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.75,.25,1); transition-delay: var(--reveal-delay, 0ms); will-change: opacity, transform; }
+/* Editorial scroll reveals: opacity and transform only, with no layout shift. */
+:root { --reveal-ease: cubic-bezier(.22, 1, .36, 1); }
+.scroll-reveal { opacity: 0; transform: translate3d(0, 20px, 0); transition: opacity .6s ease, transform .6s var(--reveal-ease); transition-delay: var(--reveal-delay, 0ms); will-change: opacity, transform; }
 .scroll-reveal--left { transform: translate3d(-38px, 0, 0); }
 .scroll-reveal--right { transform: translate3d(38px, 0, 0); }
-.scroll-reveal--up { transform: translate3d(0, 28px, 0); }
+.scroll-reveal--up { transform: translate3d(0, 20px, 0); }
 .scroll-reveal.is-visible { opacity: 1; transform: translate3d(0, 0, 0); }
 
-/* Text reveals add a lighter, staggered motion to copy across every public page. */
-.text-reveal { opacity: 0; transform: translate3d(0, 18px, 0); transition: opacity .62s ease, transform .62s cubic-bezier(.2,.75,.25,1); transition-delay: var(--text-reveal-delay, 0ms); will-change: opacity, transform; }
+/* Text reveals follow the editorial hierarchy: label, heading, copy, price, CTA. */
+.text-reveal { opacity: 0; transform: translate3d(0, 16px, 0); transition: opacity .55s ease, transform .55s var(--reveal-ease); transition-delay: var(--text-reveal-delay, 0ms); will-change: opacity, transform; }
 .text-reveal--left { transform: translate3d(-24px, 0, 0); }
 .text-reveal--right { transform: translate3d(24px, 0, 0); }
-.text-reveal--up { transform: translate3d(0, 20px, 0); }
+.text-reveal--up,
+.text-reveal--copy { transform: translate3d(0, 16px, 0); transition-duration: .55s; }
+.text-reveal--label { transform: translate3d(0, 12px, 0); transition-duration: .35s; }
+.text-reveal--heading { transform: translate3d(0, 24px, 0); transition-duration: .6s; }
+.text-reveal--price { transform: translate3d(0, 18px, 0); transition-duration: .5s; }
+.text-reveal--button { transform: translate3d(0, 12px, 0); transition-duration: .45s; }
 .text-reveal.is-visible { opacity: 1; transform: translate3d(0, 0, 0); }
 .button.text-reveal.is-visible:hover { transform: translateY(-2px); }
 
@@ -1038,10 +1044,15 @@ h1, h2, h3 { letter-spacing: -.045em; }
   .contact-intro-section .contact-cards { grid-template-columns: 1fr; }
   .scroll-reveal--left { transform: translate3d(-20px, 0, 0); }
   .scroll-reveal--right { transform: translate3d(20px, 0, 0); }
-  .scroll-reveal--up { transform: translate3d(0, 20px, 0); }
+  .scroll-reveal--up { transform: translate3d(0, 16px, 0); }
   .text-reveal--left { transform: translate3d(-14px, 0, 0); }
   .text-reveal--right { transform: translate3d(14px, 0, 0); }
-  .text-reveal--up { transform: translate3d(0, 14px, 0); }
+  .text-reveal--up,
+  .text-reveal--copy { transform: translate3d(0, 12px, 0); }
+  .text-reveal--label,
+  .text-reveal--button { transform: translate3d(0, 10px, 0); }
+  .text-reveal--heading { transform: translate3d(0, 18px, 0); }
+  .text-reveal--price { transform: translate3d(0, 14px, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

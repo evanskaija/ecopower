@@ -1638,23 +1638,50 @@ const revealSelectors = [
   '.contact-map-card',
   '.contact-form',
   '.faq-group',
-  '.faq-reference-cta'
+  '.faq-reference-cta',
+  '.hero-item-details'
 ].join(', ');
 
 const scrollRevealElements = [...document.querySelectorAll(revealSelectors)];
-scrollRevealElements.forEach((element, index) => {
+const cardRevealSelector = [
+  '.product-grid > *',
+  '.step-grid > *',
+  '.home-stove-card',
+  '.lighting-card',
+  '.stove-card',
+  '.journey-card',
+  '.person-card',
+  '.impact-number',
+  '.comparison-card',
+  '.impact-benefit',
+  '.customer-card',
+  '.partners-funder-card',
+  '.partners-wakala-card',
+  '.partners-wakala-photo',
+  '.contact-card',
+  '.faq-group'
+].join(', ');
+
+scrollRevealElements.forEach((element) => {
   element.classList.add('scroll-reveal');
-  const direction = index % 3 === 0 ? 'scroll-reveal--left' : index % 3 === 1 ? 'scroll-reveal--right' : 'scroll-reveal--up';
-  element.classList.add(direction);
-  element.style.setProperty('--reveal-delay', `${Math.min(index % 4, 3) * 70}ms`);
+  element.classList.add('scroll-reveal--up');
+  const cardIndex = element.matches(cardRevealSelector)
+    ? [...(element.parentElement?.children || [])].indexOf(element)
+    : 0;
+  element.style.setProperty('--reveal-delay', `${Math.max(0, Math.min(cardIndex, 4)) * 90}ms`);
 });
 
 const textRevealSelectors = [
   'main .eyebrow',
+  'main .card-kicker',
+  'main .hero-item-kicker',
   'main h1',
   'main h2',
   'main h3',
   'main h4',
+  'main .hero-item-price',
+  'main .price-row strong',
+  'main .home-stove-price',
   'main p:not(.eyebrow)',
   'main li',
   'main .button',
@@ -1666,11 +1693,25 @@ const textRevealSelectors = [
 ].join(', ');
 
 const textRevealElements = [...document.querySelectorAll(textRevealSelectors)];
-textRevealElements.forEach((element, index) => {
+const textRevealGroupCounts = new Map();
+const getTextRevealGroup = (element) => element.closest(
+  '.hero-copy, .hero-item-details, .section-heading, article, .story-copy, .catalogue-copy, .bundle-panel, .contact-card, .partners-business-panel, .payment-copy, .cta-inner, .footer-col'
+) || element.parentElement;
+const getTextRevealKind = (element) => {
+  if (element.matches('main .eyebrow, main .card-kicker, main .hero-item-kicker, footer h3')) return 'label';
+  if (element.matches('main h1, main h2, main h3, main h4')) return 'heading';
+  if (element.matches('main .hero-item-price, main .price-row strong, main .home-stove-price')) return 'price';
+  if (element.matches('main .button, main .text-link')) return 'button';
+  return 'copy';
+};
+
+textRevealElements.forEach((element) => {
   element.classList.add('text-reveal');
-  const direction = index % 3 === 0 ? 'text-reveal--left' : index % 3 === 1 ? 'text-reveal--right' : 'text-reveal--up';
-  element.classList.add(direction);
-  element.style.setProperty('--text-reveal-delay', `${Math.min(index % 5, 4) * 45}ms`);
+  element.classList.add(`text-reveal--${getTextRevealKind(element)}`);
+  const group = getTextRevealGroup(element);
+  const groupIndex = textRevealGroupCounts.get(group) || 0;
+  textRevealGroupCounts.set(group, groupIndex + 1);
+  element.style.setProperty('--text-reveal-delay', `${Math.min(groupIndex, 4) * 90}ms`);
 });
 
 const revealElements = [...new Set([...scrollRevealElements, ...textRevealElements])];
@@ -1898,6 +1939,13 @@ const setupHeroVideoRotation = () => {
         description.className = 'hero-item-description';
         description.textContent = activeAsset.details.description;
         detailsPanel.append(kicker, title, price, description);
+
+        const detailElements = [kicker, title, price, description];
+        detailElements.forEach((element, index) => {
+          element.classList.add('text-reveal', `text-reveal--${getTextRevealKind(element)}`);
+          element.style.setProperty('--text-reveal-delay', `${Math.min(index, 3) * 90}ms`);
+        });
+        window.requestAnimationFrame(() => detailElements.forEach((element) => element.classList.add('is-visible')));
       }
     };
 
